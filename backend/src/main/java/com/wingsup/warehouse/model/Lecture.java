@@ -14,9 +14,19 @@ public class Lecture {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 255)
+    @Column(
+        name = "name",
+        nullable = false,
+        length = 255,
+        columnDefinition = "NVARCHAR(255)"
+    )
     private String name;
 
-    @Column(nullable = false, length = 1000)
+    @Column(
+        name = "link",
+        nullable = false,
+        length = 1000,
+        columnDefinition = "NVARCHAR(1000)"
+    )
     private String link;
 }

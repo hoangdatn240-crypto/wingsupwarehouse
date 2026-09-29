@@ -68,7 +68,6 @@ public class DataInitializer implements CommandLineRunner {
         Product p = new Product();
         p.setName(name);
         p.setUnit(unit);
-        p.setPrice(new BigDecimal(price));
         p.setQuantity(qty);
         p.setMinQuantity(min);
         p.setCategory(c);

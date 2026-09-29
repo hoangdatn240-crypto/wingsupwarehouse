@@ -1,4 +1,3 @@
-
 package com.wingsup.warehouse.model;
 
 import jakarta.persistence.*;
@@ -6,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.math.BigDecimal;
 
 @Entity
 @Table(name = "products")
@@ -19,12 +17,20 @@ public class Product {
     private Long id;
 
     @NotBlank
-    @Column(nullable = false)
+    @Column(
+        name = "name",
+        nullable = false,
+        length = 255,
+        columnDefinition = "NVARCHAR(255)"
+    )
     private String name;
 
+    @Column(
+        name = "unit",
+        length = 100,
+        columnDefinition = "NVARCHAR(100)"
+    )
     private String unit;
-
-    private BigDecimal price = BigDecimal.ZERO;
 
     private int quantity;
 
@@ -39,4 +45,3 @@ public class Product {
     @JoinColumn(name = "supplier_id")
     private Supplier supplier;
 }
-

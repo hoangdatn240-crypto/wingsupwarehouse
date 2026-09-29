@@ -8,9 +8,12 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "users")
-@Getter @Setter
+@Getter
+@Setter
 public class AppUser {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank
@@ -18,13 +21,20 @@ public class AppUser {
     private String username;
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @NotBlank
+    @Column(nullable = false)
     private String password;
 
+    @NotBlank
+    @Column(name = "full_name", length = 255, nullable = false)
     private String fullName;
+
+    @NotBlank
+    @Column(name = "email", length = 255, nullable = false)
     private String email;
 
     @Enumerated(EnumType.STRING)
     private Role role = Role.USER;
 
-    private boolean active = true;
+    private boolean active = false;
 }

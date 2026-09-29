@@ -6,14 +6,19 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Getter @Setter
+@Table(name = "categories")
+@Getter
+@Setter
 public class Category {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank
-    @Column(unique = true, nullable = false)
+    @Column(name = "name", length = 255, nullable = false)
     private String name;
 
+    @Column(name = "description", length = 1000)
     private String description;
 }

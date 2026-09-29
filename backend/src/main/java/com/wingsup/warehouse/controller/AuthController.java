@@ -49,21 +49,32 @@ public class AuthController {
 
     }
 
-    @PostMapping("/login")
+
+@PostMapping("/login")
     public Map<String, Object> login(@RequestBody LoginRequest req) {
 
-        AppUser user = users.findByUsername(req.username())
-                .filter(u
-                        -> encoder.matches(
-                        req.password(),
-                        u.getPassword()
-                )
-                )
-                .orElseThrow(()
-                        -> new IllegalArgumentException(
-                        "Sai tên đăng nhập hoặc mật khẩu"
-                )
-                );
+        if (req.username() == null || req.username().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Tên đăng nhập không được để trống"
+            );
+        }
+
+        if (req.password() == null || req.password().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Mật khẩu không được để trống"
+            );
+        }
+
+        AppUser user = users.findByUsername(req.username().trim())
+                .orElseThrow(() -> new IllegalArgumentException(
+                "Tài khoản không tồn tại"
+        ));
+
+        if (!encoder.matches(req.password(), user.getPassword())) {
+            throw new IllegalArgumentException(
+                    "Mật khẩu không đúng"
+            );
+        }
 
         user.setActive(true);
         users.save(user);
@@ -74,7 +85,10 @@ public class AuthController {
         );
     }
 
-    @PostMapping("/register")
+
+    @PostMapping(
+
+    "/register")
     public Map<String, String> register(
             @RequestBody RegisterRequest req
     ) {
@@ -85,9 +99,63 @@ public class AuthController {
             );
         }
 
-        if (req.password() == null || req.password().length() < 6) {
+        if (!req.username().matches("^[a-zA-Z0-9_]+$")) {
+            throw new IllegalArgumentException(
+                    "Tên đăng nhập không được có dấu hoặc ký tự đặc biệt"
+            );
+        }
+
+        if (req.password() == null || req.password().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Mật khẩu không được để trống"
+            );
+        }
+
+        if (req.password().length() < 6) {
             throw new IllegalArgumentException(
                     "Mật khẩu phải từ 6 ký tự"
+            );
+        }
+
+        if (!req.password().matches(".*[A-Z].*")) {
+            throw new IllegalArgumentException(
+                    "Mật khẩu phải có ít nhất 1 chữ hoa"
+            );
+        }
+
+        if (!req.password().matches(".*[0-9].*")) {
+            throw new IllegalArgumentException(
+                    "Mật khẩu phải có ít nhất 1 chữ số"
+            );
+        }
+
+        if (!req.password().matches(".*[^a-zA-Z0-9].*")) {
+            throw new IllegalArgumentException(
+                    "Mật khẩu phải có ít nhất 1 ký tự đặc biệt"
+            );
+        }
+
+        if (req.password().length() < 6) {
+            throw new IllegalArgumentException(
+                    "Mật khẩu phải từ 6 ký tự"
+            );
+        }
+
+        if (req.fullName() == null || req.fullName().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Họ tên không được để trống"
+            );
+        }
+
+        if (req.email() == null || req.email().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Email không được để trống"
+            );
+        }
+
+        if (!req.email().contains("@")) {
+            throw new IllegalArgumentException(
+                    "Email không hợp lệ"
             );
         }
 
@@ -101,13 +169,14 @@ public class AuthController {
 
         user.setUsername(req.username().trim());
         user.setPassword(encoder.encode(req.password()));
-        user.setFullName(req.fullName());
-        user.setEmail(req.email());
+        user.setFullName(req.fullName().trim());
+        user.setEmail(req.email().trim());
 
         // Người tự đăng ký chỉ được tạo USER
         user.setRole(Role.USER);
 
-        user.setActive(true);
+        // Tài khoản mới chưa đăng nhập
+        user.setActive(false);
 
         users.save(user);
 

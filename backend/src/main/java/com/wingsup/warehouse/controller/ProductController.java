@@ -1,12 +1,9 @@
-
 package com.wingsup.warehouse.controller;
 
 import com.wingsup.warehouse.model.Category;
 import com.wingsup.warehouse.model.Product;
-import com.wingsup.warehouse.model.Supplier;
 import com.wingsup.warehouse.repository.CategoryRepository;
 import com.wingsup.warehouse.repository.ProductRepository;
-import com.wingsup.warehouse.repository.SupplierRepository;
 import com.wingsup.warehouse.repository.StockTransactionRepository;
 
 import jakarta.validation.Valid;
@@ -16,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -26,18 +22,15 @@ public class ProductController {
 
     private final ProductRepository repo;
     private final CategoryRepository categories;
-    private final SupplierRepository suppliers;
     private final StockTransactionRepository transactions;
 
     public ProductController(
             ProductRepository repo,
             CategoryRepository categories,
-            SupplierRepository suppliers,
             StockTransactionRepository transactions
     ) {
         this.repo = repo;
         this.categories = categories;
-        this.suppliers = suppliers;
         this.transactions = transactions;
     }
 
@@ -120,12 +113,6 @@ public class ProductController {
 
         p.setUnit(in.getUnit());
 
-        p.setPrice(
-                in.getPrice() == null
-                ? BigDecimal.ZERO
-                : in.getPrice()
-        );
-
         p.setMinQuantity(
                 Math.max(0, in.getMinQuantity())
         );
@@ -143,21 +130,6 @@ public class ProductController {
                         )
                 );
 
-        Supplier s =
-                in.getSupplier() == null
-                || in.getSupplier().getId() == null
-                ? null
-                : suppliers.findById(
-                        in.getSupplier().getId()
-                ).orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.BAD_REQUEST,
-                                "Nhà cung cấp không tồn tại"
-                        )
-                );
-
         p.setCategory(c);
-        p.setSupplier(s);
     }
 }
-

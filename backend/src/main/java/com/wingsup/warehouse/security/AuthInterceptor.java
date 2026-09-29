@@ -176,21 +176,18 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         /*
-         * USER chỉ được xem:
-         *
-         * - Sản phẩm
-         * - Danh mục
-         * - Nhà cung cấp
-         *
-         * Không được thêm / sửa / xóa.
+    * USER chỉ được xem:
+    *
+    * - Sản phẩm
+    * - Danh mục
+    *
+    * Không được thêm / sửa / xóa.
          */
         if (path.startsWith("/api/products")
-                || path.startsWith("/api/categories")
-                || path.startsWith("/api/suppliers")) {
+                || path.startsWith("/api/categories")) {
 
             return !read;
         }
-
         /*
          * Các API khác USER được phép
          * theo Controller hiện tại.
