@@ -1,13 +1,10 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.wingsup.warehouse.controller;
 
 import com.wingsup.warehouse.model.Lecture;
 import com.wingsup.warehouse.repository.LectureRepository;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -21,60 +18,122 @@ public class LectureController {
         this.lectureRepository = lectureRepository;
     }
 
-    // Lấy danh sách bài giảng
     @GetMapping
     public List<Lecture> getAll() {
         return lectureRepository.findAll();
     }
 
-    // Thêm bài giảng
     @PostMapping
     public Lecture create(@RequestBody Lecture lecture) {
 
-        if (lecture.getName() == null || lecture.getName().trim().isEmpty()) {
-            throw new RuntimeException("Tên bài giảng không được để trống");
+        if (lecture.getName() == null
+                || lecture.getName().trim().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tên bài giảng không được để trống"
+            );
         }
 
-        if (lecture.getLink() == null || lecture.getLink().trim().isEmpty()) {
-            throw new RuntimeException("Link bài giảng không được để trống");
+        if (lecture.getLink() == null
+                || lecture.getLink().trim().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Link bài giảng không được để trống"
+            );
         }
 
-        lecture.setName(lecture.getName().trim());
+        String name = lecture.getName().trim();
+
+        if (!name.matches("[\\p{L}\\p{N}\\s]+")) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tên bài giảng không được có ký tự đặc biệt"
+            );
+        }
+
+        if (lectureRepository.existsByNameIgnoreCase(name)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Tên bài giảng '" + name + "' đã tồn tại"
+            );
+        }
+
+        lecture.setName(name);
         lecture.setLink(lecture.getLink().trim());
 
         return lectureRepository.save(lecture);
     }
 
-    // Sửa bài giảng
     @PutMapping("/{id}")
-    public ResponseEntity<Lecture> update(
+    public Lecture update(
             @PathVariable Long id,
             @RequestBody Lecture data
     ) {
 
-        return lectureRepository.findById(id)
-                .map(lecture -> {
+        Lecture lecture = lectureRepository.findById(id)
+                .orElseThrow(()
+                        -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy bài giảng"
+                )
+                );
 
-                    lecture.setName(data.getName().trim());
-                    lecture.setLink(data.getLink().trim());
+        if (data.getName() == null
+                || data.getName().trim().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tên bài giảng không được để trống"
+            );
+        }
 
-                    return ResponseEntity.ok(
-                            lectureRepository.save(lecture)
-                    );
-                })
-                .orElse(ResponseEntity.notFound().build());
+        if (data.getLink() == null
+                || data.getLink().trim().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Link bài giảng không được để trống"
+            );
+        }
+
+        String name = data.getName().trim();
+
+        if (!name.matches("[\\p{L}\\p{N}\\s]+")) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tên bài giảng không được có ký tự đặc biệt"
+            );
+        }
+
+        boolean trungTen = lectureRepository.findAll()
+                .stream()
+                .anyMatch(x
+                        -> !x.getId().equals(id)
+                && x.getName() != null
+                && x.getName().trim().equalsIgnoreCase(name)
+                );
+
+        if (trungTen) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Tên bài giảng '" + name + "' đã tồn tại"
+            );
+        }
+
+        lecture.setName(name);
+        lecture.setLink(data.getLink().trim());
+
+        return lectureRepository.save(lecture);
     }
 
-    // Xóa bài giảng
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public void delete(@PathVariable Long id) {
 
         if (!lectureRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Không tìm thấy bài giảng"
+            );
         }
 
         lectureRepository.deleteById(id);
-
-        return ResponseEntity.noContent().build();
     }
 }

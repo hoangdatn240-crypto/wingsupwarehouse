@@ -31,23 +31,36 @@ public class CategoryController {
     }
 
     @PostMapping
-    public Category create(
-            @Valid @RequestBody Category in
-    ) {
+    public Category create(@RequestBody Category category) {
 
-        String name = in.getName().trim();
+        if (category.getName() == null
+                || category.getName().trim().isEmpty()) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tên danh mục không được để trống"
+            );
+        }
+
+        String name = category.getName().trim();
 
         if (repo.existsByNameIgnoreCase(name)) {
+
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Tên danh mục '" + name + "' đã tồn tại"
             );
         }
 
-        in.setId(null);
-        in.setName(name);
+        category.setName(name);
 
-        return repo.save(in);
+        if (category.getDescription() != null) {
+            category.setDescription(
+                    category.getDescription().trim()
+            );
+        }
+
+        return repo.save(category);
     }
 
     @PutMapping("/{id}")
@@ -57,16 +70,27 @@ public class CategoryController {
     ) {
 
         Category c = repo.findById(id)
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "Không tìm thấy danh mục"
-                        )
+                .orElseThrow(()
+                        -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy danh mục"
+                )
                 );
+
+        if (in.getName() == null
+                || in.getName().trim().isEmpty()) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tên danh mục không được để trống"
+            );
+        }
 
         String name = in.getName().trim();
 
+        // Kiểm tra trùng tên nhưng bỏ qua chính danh mục đang sửa
         if (repo.existsByNameIgnoreCaseAndIdNot(name, id)) {
+
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Tên danh mục '" + name + "' đã tồn tại"
@@ -74,17 +98,23 @@ public class CategoryController {
         }
 
         c.setName(name);
-        c.setDescription(in.getDescription());
+
+        if (in.getDescription() != null) {
+            c.setDescription(
+                    in.getDescription().trim()
+            );
+        } else {
+            c.setDescription("");
+        }
 
         return repo.save(c);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(
-            @PathVariable Long id
-    ) {
+    public void delete(@PathVariable Long id) {
 
         if (!repo.existsById(id)) {
+
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
                     "Không tìm thấy danh mục"
@@ -92,6 +122,7 @@ public class CategoryController {
         }
 
         if (products.existsByCategoryId(id)) {
+
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Không thể xóa danh mục vì đang có sản phẩm sử dụng danh mục này"

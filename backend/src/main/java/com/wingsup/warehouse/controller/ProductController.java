@@ -53,6 +53,22 @@ public class ProductController {
     @PostMapping
     public Product create(@Valid @RequestBody Product in) {
 
+        if (in.getName() == null || in.getName().trim().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tên sản phẩm không được để trống"
+            );
+        }
+
+        String name = in.getName().trim();
+
+        if (repo.existsByNameIgnoreCase(name)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Tên sản phẩm '" + name + "' đã tồn tại"
+            );
+        }
+
         Product p = new Product();
 
         copy(p, in);
@@ -75,6 +91,22 @@ public class ProductController {
                         HttpStatus.NOT_FOUND,
                         "Không tìm thấy sản phẩm"
                 ));
+
+        if (in.getName() == null || in.getName().trim().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Tên sản phẩm không được để trống"
+            );
+        }
+
+        String name = in.getName().trim();
+
+        if (repo.existsByNameIgnoreCaseAndIdNot(name, id)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Tên sản phẩm '" + name + "' đã tồn tại"
+            );
+        }
 
         copy(p, in);
 

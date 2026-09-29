@@ -38,58 +38,105 @@ function clearSession() {
 
 async function api(path, method = 'GET', body) {
     const headers = {'Content-Type': 'application/json'};
+
     if (token)
         headers.Authorization = 'Bearer ' + token;
-    const res = await fetch('/api' + path, {method, headers, body: body !== undefined ? JSON.stringify(body) : undefined});
+
+    const res = await fetch('/api' + path, {
+        method,
+        headers,
+        body: body !== undefined
+            ? JSON.stringify(body)
+            : undefined
+    });
+
     const text = await res.text();
+
     let data = null;
+
     try {
         data = text ? JSON.parse(text) : null;
     } catch (e) {
         data = null;
     }
+
     if (res.status === 401 && path !== '/auth/login') {
         clearSession();
         location.hash = '#/login';
         render();
         throw new Error('Phiên đăng nhập đã hết hạn');
     }
+
     if (!res.ok) {
+
         console.error('API ERROR:', {
             status: res.status,
             statusText: res.statusText,
             data: data,
             raw: text
         });
-        throw new Error(
+
+        // =========================
+        // LỖI TRÙNG DỮ LIỆU
+        // =========================
+        if (res.status === 409) {
+
+            if (path.startsWith('/products')) {
+                throw new Error('Tên sản phẩm đã tồn tại');
+            }
+
+            if (path.startsWith('/categories')) {
+                throw new Error('Tên danh mục đã tồn tại');
+            }
+
+            if (path.startsWith('/lectures')) {
+                throw new Error('Tên bài giảng đã tồn tại');
+            }
+        }
+
+        // =========================
+        // LỖI BÀI GIẢNG
+        // =========================
+        if (res.status === 400 && path.startsWith('/lectures')) {
+            throw new Error(
                 (data && data.message)
-                || text
-                || 'Có lỗi xảy ra (' + res.status + ')'
-                );
+                || (data && data.detail)
+                || 'Tên bài giảng không được có ký tự đặc biệt'
+            );
+        }
+
+        // =========================
+        // LỖI CHUNG
+        // =========================
+        throw new Error(
+            (data && data.message)
+            || (data && data.detail)
+            || text
+            || 'Có lỗi xảy ra (' + res.status + ')'
+        );
     }
+
     return data;
 }
-
-
 
 /* ================= Khung trang & điều hướng ================= */
 function layout() {
     const links = [
-        ['#/', 'Trang Chủ'],
-        ['#/products', 'Sản phẩm'],
-        ['#/transactions', 'Phiếu nhập/xuất'],
+        ['#/', '🏠 Trang Chủ'],
+        ['#/products', '📦 Sản phẩm'],
+        ['#/transactions', '🧾 Phiếu nhập/xuất'],
         ['#/lectures', '📚 Bài giảng']
     ];
     // ADMIN và MANAGER được dùng Danh mục + Nhà cung cấp
     if (isAdmin() || user?.role === 'MANAGER') {
         links.push(
-                ['#/categories', 'Danh mục'],
+                ['#/categories', '🗂️ Danh mục'],
                 );
     }
 
 // Chỉ ADMIN được thấy Người dùng
     if (isAdmin()) {
-        links.push(['#/users', 'Người dùng']);
+        links.push(['#/users', '👥 Người dùng']);
     }
 
     const here = location.hash || '#/';
@@ -752,23 +799,27 @@ function prodDraw() {
 
         ${err(prod.error)}
 
-        <div class="toolbar">
-            <input
-                id="q"
-                placeholder="Tìm theo tên sản phẩm"
-                value="${esc(prod.q)}"
-            >
+        <div class="toolbar">  
+    <input  
+        id="q"  
+        placeholder="🔍 Nhập tên sản phẩm..."  
+        value="${esc(prod.q)}" 
+        style="min-width:280px;" 
+    >  
 
-            <button class="btn ghost" onclick="prodSearch()">
-                Tìm
-            </button>
+    <button  
+        class="btn"  
+        onclick="prodSearch()" 
+    >  
+        🔍 Tìm kiếm  
+    </button>  
 
-            ${
+    ${
             canManage
             ? '<button class="btn" onclick="prodAdd()">Thêm sản phẩm</button>'
             : ''
-            }
-        </div>
+            }  
+</div>
 
         ${prod.form ? prodFormHtml() : ''}
 
@@ -837,7 +888,21 @@ function prodDraw() {
 /* ================= Phiếu nhập/xuất ================= */
 let tx = {};
 async function pageTransactions() {
-    tx = {items: [], products: [], form: {productId: '', type: 'IN', quantity: 1, note: ''}, error: '', success: ''};
+    tx = {
+        items: [],
+        products: [],
+        form: {
+            productId: '',
+            type: 'IN',
+            quantity: 1,
+            note: ''
+        },
+        error: '',
+        success: '',
+        fromDate: '',
+        toDate: ''
+    };
+
     txLoad();
 }
 
@@ -934,93 +999,373 @@ const txCanCancel = (t) =>
                     || isManager()
                     || (t.createdBy && t.createdBy.id === user.id)
                     );
-function txDraw() {
-    const f = tx.form;
-    draw(`
-    <h1>Phiếu nhập/xuất kho</h1>
-    ${err(tx.error)}${okMsg(tx.success)}
-    <div class="panel">
-      <h2>Tạo phiếu mới</h2>
-      <div class="form">
-        <label>Loại phiếu
-          <select id="t_type">
-            <option value="IN" ${f.type === 'IN' ? 'selected' : ''}>Nhập kho</option>
-            <option value="OUT" ${f.type === 'OUT' ? 'selected' : ''}>Xuất kho</option>
-          </select></label>
-        <label>Sản phẩm
-          <select id="t_prod"><option value="">— Chọn sản phẩm —</option>
-${tx.products.map((p) => `
-    <option value="${p.id}" ${String(p.id) === String(f.productId) ? 'selected' : ''}>
-        ID ${p.id} – ${esc(p.name)} (tồn ${p.quantity})
-    </option>
-`).join('')}          </select></label>
-        <label>Số lượng <input id="t_qty" type="number" min="1" value="${esc(f.quantity)}"></label>
-        <label>Ghi chú <input id="t_note" value="${esc(f.note)}"></label>
-        <button class="btn" onclick="txCreate()">Tạo phiếu</button>
-      </div>
-    </div>
-    <div class="panel table-wrap">
-      ${tx.items.length ? `<table>
-        <thead><tr><th>Thời gian</th><th>Loại</th><th>Sản phẩm</th><th class="num">SL</th><th>Người tạo</th><th>Ghi chú</th><th>Trạng thái</th><th></th></tr></thead>
-        <tbody>${tx.items.map((t) => `<tr>
-  <td>${dt(t.createdAt)}</td>
 
-  <td>
-    <span class="badge ${t.type}">
-      ${t.type === 'IN' ? 'Nhập' : 'Xuất'}
-    </span>
-  </td>
+function txFilterDate() {
+    const from = document.getElementById('tx_from_date');
+    const to = document.getElementById('tx_to_date');
 
-  <td>
-    ${esc(t.product?.name || 'Sản phẩm đã xóa')}
-  </td>
+    tx.fromDate = from ? from.value : '';
+    tx.toDate = to ? to.value : '';
 
-  <td class="num">${t.quantity}</td>
-
-  <td>
-    ${esc(t.createdBy
-                ? (t.createdBy.fullName || t.createdBy.username)
-                : '')}
-  </td>
-
-  <td>${esc(t.note || '')}</td>
-
-  <td>
-    <span class="badge ${t.status}">
-      ${STATUS[t.status] || t.status}
-    </span>
-  </td>
-
-  <td>
-    <div class="actions">
-      ${canManageWarehouse() && t.status === 'PENDING' ? `
-        <button
-          class="btn ok small"
-          onclick="txApprove(${t.id})">
-          Duyệt
-        </button>
-
-        <button
-          class="btn danger small"
-          onclick="txReject(${t.id})">
-          Từ chối
-        </button>
-      ` : ''}
-
-      ${txCanCancel(t) ? `
-        <button
-          class="btn ghost small"
-          onclick="txCancel(${t.id})">
-          Hủy phiếu
-        </button>
-      ` : ''}
-    </div>
-  </td>
-
-</tr>`).join('')}</tbody></table>` : '<div class="empty">Chưa có phiếu nào.</div>'}
-    </div>`);
+    txDraw();
 }
 
+
+function txDraw() {
+
+    const f = tx.form;
+
+    const filteredItems = tx.items.filter(t => {
+
+        if (!tx.fromDate && !tx.toDate) {
+            return true;
+        }
+
+        const date = new Date(t.createdAt);
+
+        if (isNaN(date.getTime())) {
+            return false;
+        }
+
+        const itemDate =
+                date.getFullYear() +
+                '-' +
+                String(date.getMonth() + 1).padStart(2, '0') +
+                '-' +
+                String(date.getDate()).padStart(2, '0');
+
+        if (tx.fromDate && itemDate < tx.fromDate) {
+            return false;
+        }
+
+        if (tx.toDate && itemDate > tx.toDate) {
+            return false;
+        }
+
+        return true;
+    });
+
+    draw(`
+
+    <h1>Phiếu nhập/xuất kho</h1>
+
+    ${err(tx.error)}
+    ${okMsg(tx.success)}
+
+    <div class="panel">
+
+        <h2>Tạo phiếu mới</h2>
+
+        <div class="form">
+
+            <label>
+                Loại phiếu
+
+                <select id="t_type">
+
+                    <option
+                        value="IN"
+                        ${f.type === 'IN' ? 'selected' : ''}
+                    >
+                        Nhập kho
+                    </option>
+
+                    <option
+                        value="OUT"
+                        ${f.type === 'OUT' ? 'selected' : ''}
+                    >
+                        Xuất kho
+                    </option>
+
+                </select>
+
+            </label>
+
+
+            <label>
+                Sản phẩm
+
+                <select id="t_prod">
+
+                    <option value="">
+                        — Chọn sản phẩm —
+                    </option>
+
+                    ${tx.products.map((p) => `
+
+                        <option
+                            value="${p.id}"
+                            ${String(p.id) === String(f.productId) ? 'selected' : ''}
+                        >
+                            ID ${p.id} – ${esc(p.name)} (tồn ${p.quantity})
+                        </option>
+
+                    `).join('')}
+
+                </select>
+
+            </label>
+
+
+            <label>
+                Số lượng
+
+                <input
+                    id="t_qty"
+                    type="number"
+                    min="1"
+                    value="${esc(f.quantity)}"
+                >
+
+            </label>
+
+
+            <label>
+                Ghi chú
+
+                <input
+                    id="t_note"
+                    value="${esc(f.note)}"
+                >
+
+            </label>
+
+
+            <button
+                class="btn"
+                onclick="txCreate()"
+            >
+                Tạo phiếu
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- LỌC LỊCH SỬ -->
+
+    <div style="
+    display:flex;
+    align-items:end;
+    gap:10px;
+    margin:15px 0;
+    flex-wrap:wrap;
+">
+
+    <label style="margin:0;">
+        Từ ngày
+
+        <input
+            type="date"
+            id="tx_from_date"
+            value="${tx.fromDate || ''}"
+            style="width:150px;"
+        >
+    </label>
+
+
+    <label style="margin:0;">
+        Đến ngày
+
+        <input
+            type="date"
+            id="tx_to_date"
+            value="${tx.toDate || ''}"
+            style="width:150px;"
+        >
+    </label>
+
+
+    <button
+        class="btn"
+        onclick="txFilterDate()"
+        style="height:38px;"
+    >
+        🔍 Lọc
+    </button>
+
+</div>
+
+
+    <!-- LỊCH SỬ PHIẾU -->
+
+    <div class="panel table-wrap">
+
+        ${
+            filteredItems.length
+
+            ? `
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>Thời gian</th>
+
+                        <th>Loại</th>
+
+                        <th>Sản phẩm</th>
+
+                        <th class="num">
+                            SL
+                        </th>
+
+                        <th>Người tạo</th>
+
+                        <th>Ghi chú</th>
+
+                        <th>Trạng thái</th>
+
+                        <th></th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    ${filteredItems.map((t) => `
+
+                        <tr>
+
+                            <td>
+                                ${dt(t.createdAt)}
+                            </td>
+
+
+                            <td>
+
+                                <span class="badge ${t.type}">
+                                    ${t.type === 'IN' ? 'Nhập' : 'Xuất'}
+                                </span>
+
+                            </td>
+
+
+                            <td>
+                                ${esc(
+                        t.product?.name ||
+                        'Sản phẩm đã xóa'
+                        )}
+                            </td>
+
+
+                            <td class="num">
+                                ${t.quantity}
+                            </td>
+
+
+                            <td>
+                                ${esc(
+                        t.createdBy
+                        ? (
+                                t.createdBy.fullName ||
+                                t.createdBy.username
+                                )
+                        : ''
+                        )}
+                            </td>
+
+
+                            <td>
+                                ${esc(t.note || '')}
+                            </td>
+
+
+                            <td>
+
+                                <span class="badge ${t.status}">
+                                    ${STATUS[t.status] || t.status}
+                                </span>
+
+                            </td>
+
+
+                            <td>
+
+                                <div class="actions">
+
+                                    ${
+                        canManageWarehouse() &&
+                        t.status === 'PENDING'
+
+                        ? `
+
+                                        <button
+                                            class="btn ok small"
+                                            onclick="txApprove(${t.id})"
+                                        >
+                                            Duyệt
+                                        </button>
+
+
+                                        <button
+                                            class="btn danger small"
+                                            onclick="txReject(${t.id})"
+                                        >
+                                            Từ chối
+                                        </button>
+
+                                        `
+
+                        : ''
+                        }
+
+
+                                    ${
+                        txCanCancel(t)
+
+                        ? `
+
+                                        <button
+                                            class="btn ghost small"
+                                            onclick="txCancel(${t.id})"
+                                        >
+                                            Hủy phiếu
+                                        </button>
+
+                                        `
+
+                        : ''
+                        }
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+                    `).join('')}
+
+                </tbody>
+
+            </table>
+
+            `
+
+            : `
+
+            <div class="empty">
+
+                ${
+            tx.fromDate || tx.toDate
+            ? 'Không có phiếu nào trong khoảng thời gian đã chọn.'
+            : 'Chưa có phiếu nào.'
+            }
+
+            </div>
+
+            `
+            }
+
+    </div>
+
+    `);
+}
 /* ================= Danh mục / Người dùng (dùng chung) ================= */
 const CRUD = {
     categories: {
@@ -1061,7 +1406,15 @@ const CRUD = {
 };
 let crud = null;
 async function pageCrud(key) {
-    crud = {key, cfg: CRUD[key], items: [], editing: null, values: null, error: ''};
+    crud = {
+        key,
+        cfg: CRUD[key],
+        items: [],
+        editing: null,
+        values: null,
+        error: '',
+        search: ''
+    };
     crudLoad();
 }
 
@@ -1073,6 +1426,15 @@ async function crudLoad() {
     }
     crudDraw();
 }
+
+function crudSearch() {
+    const input = document.getElementById('crud_search');
+
+    crud.search = input ? input.value.trim() : '';
+
+    crudDraw();
+}
+
 
 function crudBlank() {
     const v = {};
@@ -1125,11 +1487,18 @@ async function crudSave() {
                 : el.value.trim();
     });
 
-    // ================= DANH MỤC =================
+// ================= DANH MỤC =================
     if (crud.key === 'categories') {
 
         if (!v.name) {
             crud.error = 'Tên danh mục không được để trống';
+            crud.values = v;
+            crudDraw();
+            return;
+        }
+
+        if (!v.description) {
+            crud.error = 'Mô tả không được để trống';
             crud.values = v;
             crudDraw();
             return;
@@ -1222,55 +1591,6 @@ async function crudSave() {
     } catch (e) {
         crud.error = e.message;
         crud.values = v;
-        crudDraw();
-    }
-}
-
-// =========================
-// KIỂM TRA NGƯỜI DÙNG
-// =========================
-async function crudSave() {
-    if (crud.key === 'users') {
-        if (!v.username) {
-            crud.error = 'Tên đăng nhập không được để trống';
-            crud.values = v;
-            crudDraw();
-            return;
-        }
-
-        if (!v.fullName) {
-            crud.error = 'Họ tên không được để trống';
-            crud.values = v;
-            crudDraw();
-            return;
-        }
-
-        if (!v.email) {
-            crud.error = 'Email không được để trống';
-            crud.values = v;
-            crudDraw();
-            return;
-        }
-    }
-
-    try {
-        const url = crud.cfg.endpoint +
-                (crud.editing ? '/' + crud.editing : '');
-        await api(
-                url,
-                crud.editing ? 'PUT' : 'POST',
-                v
-                );
-        crud.form = null;
-        crud.editing = null;
-        crud.error = '';
-        await crudLoad();
-    } catch (e) {
-        crud.error = e.message;
-        crud.form = {
-            name: '',
-            description: ''
-        };
         crudDraw();
     }
 }
@@ -1409,79 +1729,165 @@ function crudFormHtml() {
 }
 
 function crudDraw() {
-    const shown = crud.cfg.fields.filter((f) => !f.hideInTable);
+
+    const shown = crud.cfg.fields.filter(f => !f.hideInTable);
+
+    const keyword = (crud.search || '').toLowerCase().trim();
+
+    const filteredItems = crud.items.filter(item => {
+
+        const text = shown
+                .map(f => item[f.key] ?? '')
+                .join(' ')
+                .toLowerCase();
+
+        return text.includes(keyword);
+    });
 
     draw(`
+
         <h1>${crud.cfg.title}</h1>
 
         ${err(crud.error)}
 
         <div class="toolbar">
-            <button class="btn" onclick="crudAdd()">
+
+            <input
+                type="text"
+                id="crud_search"
+                placeholder="${
+            crud.key === 'categories'
+            ? '🔍 Nhập tên danh mục...'
+            : '🔍 Nhập tên người dùng...'
+            }"
+                value=""
+                style="min-width:280px;"
+            >
+
+            <button
+                class="btn"
+                onclick="crudSearch()"
+            >
+                🔍 Tìm kiếm
+            </button>
+
+            <button
+                class="btn"
+                onclick="crudAdd()"
+            >
                 Thêm mới
             </button>
+
         </div>
 
         ${crud.values ? crudFormHtml() : ''}
 
         <div class="panel table-wrap">
+
             ${
-                crud.items.length
-                    ? `
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    ${shown.map(f => `
-                                        <th>${esc(f.label)}</th>
-                                    `).join('')}
-                                    <th>Thao tác</th>
-                                </tr>
-                            </thead>
+            filteredItems.length
 
-                            <tbody>
-                                ${crud.items.map(it => `
-                                    <tr>
-                                        <td>${it.id}</td>
+            ? `
 
-                                        ${shown.map(f => `
-                                            <td>
-                                                ${
-                                                    f.type === 'checkbox'
-                                                        ? (it[f.key] ? 'Có' : 'Không')
-                                                        : esc(it[f.key] ?? '')
-                                                }
-                                            </td>
-                                        `).join('')}
+                <table>
 
-                                        <td>
-                                            <button
-                                                class="btn ghost small"
-                                                onclick="crudEdit(${it.id})"
-                                            >
-                                                Sửa
-                                            </button>
+                    <thead>
 
-                                            <button
-                                                class="btn danger small"
-                                                onclick="crudDelete(${it.id})"
-                                            >
-                                                Xóa
-                                            </button>
-                                        </td>
-                                    </tr>
+                        <tr>
+
+                            <th>ID</th>
+
+                            ${shown.map(f => `
+                                <th>${esc(f.label)}</th>
+                            `).join('')}
+
+                            <th>Thao tác</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        ${
+            filteredItems.map(it => `
+
+                            <tr>
+
+                                <td>
+                                    ${it.id}
+                                </td>
+
+                                ${shown.map(f => `
+
+                                    <td>
+
+                                        ${
+                            f.type === 'checkbox'
+                            ? (it[f.key] ? 'Có' : 'Không')
+                            : esc(it[f.key] ?? '')
+                            }
+
+                                    </td>
+
                                 `).join('')}
-                            </tbody>
-                        </table>
-                    `
-                    : `
-                        <div class="empty">
-                            Chưa có dữ liệu.
-                        </div>
-                    `
+
+                                <td>
+
+                                    <button
+                                        class="btn ghost small"
+                                        onclick="crudEdit(${it.id})"
+                                    >
+                                        Sửa
+                                    </button>
+
+                                    <button
+                                        class="btn danger small"
+                                        onclick="crudDelete(${it.id})"
+                                    >
+                                        Xóa
+                                    </button>
+
+                                </td>
+
+                            </tr>
+
+                        `).join('')}
+
+                    </tbody>
+
+                </table>
+
+            `
+
+            : `
+
+                <div class="empty">
+
+                    ${
+            keyword
+            ? 'Không tìm thấy dữ liệu phù hợp.'
+            : 'Chưa có dữ liệu.'
             }
+
+                </div>
+
+            `
+            }
+
         </div>
+
     `);
+
+    const search = document.getElementById('crud_search');
+
+    if (search) {
+        search.addEventListener('keyup', e => {
+            if (e.key === 'Enter') {
+                crudSearch();
+            }
+        });
+    }
 }
 
 
@@ -1698,7 +2104,17 @@ function lectureFormHtml() {
 
 function lectureDraw() {
 
-    const canManage = isAdmin() || isManager();
+    const canManage = true;
+
+    const keyword = (lectures.search || '').toLowerCase().trim();
+
+    const filteredItems = lectures.items.filter(item => {
+        const name = (item.name || '').toLowerCase();
+        const link = (item.link || '').toLowerCase();
+
+        return name.includes(keyword) || link.includes(keyword);
+    });
+
     draw(`
 
         <h1>📚 Bài giảng</h1>
@@ -1707,18 +2123,27 @@ function lectureDraw() {
 
         <div class="toolbar">
 
-            ${
-            canManage
-            ? `
-                        <button
-                            class="btn"
-                            onclick="lectureAdd()"
-                        >
-                            + Thêm bài giảng
-                        </button>
-                    `
-            : ''
-            }
+            <input
+                type="text"
+                id="lecture_search"
+                placeholder="🔍 Nhập tên bài giảng..."
+                value=""
+                style="min-width:280px;"
+            >
+
+            <button
+                class="btn"
+                onclick="lectureSearch()"
+            >
+                🔍 Tìm kiếm
+            </button>
+
+            <button
+                class="btn"
+                onclick="lectureAdd()"
+            >
+                + Thêm bài giảng
+            </button>
 
         </div>
 
@@ -1731,114 +2156,110 @@ function lectureDraw() {
         <div class="panel table-wrap">
 
             ${
-            lectures.items.length
+            filteredItems.length
 
             ? `
 
-                        <table>
+                <table>
 
-                            <thead>
+                    <thead>
 
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Tên bài giảng</th>
-                                    <th>Link</th>
-                                    ${
-            canManage
-            ? '<th>Thao tác</th>'
-            : ''
-            }
-                                </tr>
+                        <tr>
+                            <th>ID</th>
+                            <th>Tên bài giảng</th>
+                            <th>Link</th>
+                            <th>Thao tác</th>
+                        </tr>
 
-                            </thead>
+                    </thead>
 
-                            <tbody>
+                    <tbody>
 
-                                ${
-            lectures.items
-            .map((item, index) => `
+                        ${
+            filteredItems
+            .map(item => `
 
-                                            <tr>
+                            <tr>
 
-                                                <td>
-                                                    ${index + 1}
-                                                </td>
+                                <td>
+                                    ${item.id}
+                                </td>
 
-                                                <td>
-                                                    <b>
-                                                        ${esc(item.name)}
-                                                    </b>
-                                                </td>
+                                <td>
+                                    <b>
+                                        ${esc(item.name)}
+                                    </b>
+                                </td>
 
-                                                <td>
+                                <td>
 
-                                                    <button
-                                                        class="btn small"
-                                                        onclick="lectureOpen('${esc(item.link)}')"
-                                                    >
-                                                        🔗 Mở bài giảng
-                                                    </button>
+                                    <button
+                                        class="btn small"
+                                        onclick="lectureOpen('${esc(item.link)}')"
+                                    >
+                                        🔗 Mở bài giảng
+                                    </button>
 
-                                                </td>
+                                </td>
 
-                                                ${
-                        canManage
-                        ? `
+                                <td>
 
-                                                            <td>
+                                    <div class="actions">
 
-                                                                <div
-                                                                    class="actions"
-                                                                >
+                                        <button
+                                            class="btn ghost small"
+                                            onclick="lectureEdit(${item.id})"
+                                        >
+                                            Sửa
+                                        </button>
 
-                                                                    <button
-                                                                        class="btn ghost small"
-                                                                        onclick="lectureEdit(${item.id})"
-                                                                    >
-                                                                        Sửa
-                                                                    </button>
+                                        <button
+                                            class="btn danger small"
+                                            onclick="lectureDelete(${item.id})"
+                                        >
+                                            Xóa
+                                        </button>
 
-                                                                    <button
-                                                                        class="btn danger small"
-                                                                        onclick="lectureDelete(${item.id})"
-                                                                    >
-                                                                        Xóa
-                                                                    </button>
+                                    </div>
 
-                                                                </div>
+                                </td>
 
-                                                            </td>
+                            </tr>
 
-                                                        `
-                        : ''
-                        }
-
-                                            </tr>
-
-                                        `)
+                        `)
             .join('')
             }
 
-                            </tbody>
+                    </tbody>
 
-                        </table>
+                </table>
 
-                    `
+            `
 
             : `
 
-                        <div class="empty">
+                <div class="empty">
+                    ${
+            keyword
+            ? 'Không tìm thấy bài giảng phù hợp.'
+            : 'Chưa có bài giảng nào.'
+            }
+                </div>
 
-                            Chưa có bài giảng nào.
-
-                        </div>
-
-                    `
+            `
             }
 
         </div>
 
     `);
+}
+
+function lectureSearch() {
+    const input = document.getElementById('lecture_search');
+
+    lectures.search = input ? input.value.trim() : '';
+
+    lectureDraw();
 }
 
 

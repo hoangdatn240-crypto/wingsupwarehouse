@@ -1,4 +1,3 @@
-
 package com.wingsup.warehouse.repository;
 
 import com.wingsup.warehouse.model.Product;
@@ -17,6 +16,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsBySupplierId(Long supplierId);
 
+    boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
+
     @Query("""
         select p
         from Product p
@@ -33,4 +36,3 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     """)
     void clearSupplier(@Param("supplierId") Long supplierId);
 }
-
