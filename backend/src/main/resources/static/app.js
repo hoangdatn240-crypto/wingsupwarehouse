@@ -1,46 +1,77 @@
-
 /* ================= Tiện ích ================= */
-const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+}[c]));
+
 const dt = (s) => (s ? new Date(s).toLocaleString('vi-VN') : '');
 const err = (m) => (m ? `<div class="msg error">${esc(m)}</div>` : '');
 const okMsg = (m) => (m ? `<div class="msg success">${esc(m)}</div>` : '');
+
 const draw = (html) => {
     const el = document.getElementById('content');
-    if (el)
+
+    if (el) {
         el.innerHTML = html;
+    }
 };
+
 const val = (id) => {
     const el = document.getElementById(id);
+
     if (!el) {
         throw new Error('Không tìm thấy ô nhập có id: ' + id);
     }
 
     return el.value;
 };
-const STATUS = {PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Từ chối'};
+
+const STATUS = {
+    PENDING: 'Chờ duyệt',
+    APPROVED: 'Đã duyệt',
+    REJECTED: 'Từ chối'
+};
+
 let token = localStorage.getItem('token');
 let user = JSON.parse(localStorage.getItem('user') || 'null');
+
 const isAdmin = () => !!user && user.role === 'ADMIN';
 const isManager = () => !!user && user.role === 'MANAGER';
-const canManageWarehouse = () => isAdmin() || isManager();
+
+const canManageWarehouse = () =>
+    isAdmin() || isManager();
+
 function setSession(t, u) {
     token = t;
     user = u;
+
     localStorage.setItem('token', t);
     localStorage.setItem('user', JSON.stringify(u));
 }
+
 function clearSession() {
     token = null;
     user = null;
+
     localStorage.removeItem('token');
     localStorage.removeItem('user');
 }
 
-async function api(path, method = 'GET', body) {
-    const headers = {'Content-Type': 'application/json'};
 
-    if (token)
+/* ================= API ================= */
+
+async function api(path, method = 'GET', body) {
+
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+
+    if (token) {
         headers.Authorization = 'Bearer ' + token;
+    }
 
     const res = await fetch('/api' + path, {
         method,
@@ -61,9 +92,13 @@ async function api(path, method = 'GET', body) {
     }
 
     if (res.status === 401 && path !== '/auth/login') {
+
         clearSession();
+
         location.hash = '#/login';
+
         render();
+
         throw new Error('Phiên đăng nhập đã hết hạn');
     }
 
@@ -76,9 +111,6 @@ async function api(path, method = 'GET', body) {
             raw: text
         });
 
-        // =========================
-        // LỖI TRÙNG DỮ LIỆU
-        // =========================
         if (res.status === 409) {
 
             if (path.startsWith('/products')) {
@@ -94,10 +126,10 @@ async function api(path, method = 'GET', body) {
             }
         }
 
-        // =========================
-        // LỖI BÀI GIẢNG
-        // =========================
-        if (res.status === 400 && path.startsWith('/lectures')) {
+        if (
+            res.status === 400 &&
+            path.startsWith('/lectures')
+        ) {
             throw new Error(
                 (data && data.message)
                 || (data && data.detail)
@@ -105,9 +137,6 @@ async function api(path, method = 'GET', body) {
             );
         }
 
-        // =========================
-        // LỖI CHUNG
-        // =========================
         throw new Error(
             (data && data.message)
             || (data && data.detail)
@@ -119,642 +148,1634 @@ async function api(path, method = 'GET', body) {
     return data;
 }
 
+
+/* ================= Thông báo ================= */
+
+async function loadNotifications() {
+
+    try {
+        return await api('/notifications');
+
+    } catch (e) {
+
+        console.error(
+            'Không tải được thông báo:',
+            e
+        );
+
+        return [];
+    }
+}
+
+
+async function loadUnreadCount() {
+
+    try {
+
+        const data =
+            await api('/notifications/unread-count');
+
+        return data.count || 0;
+
+    } catch (e) {
+
+        console.error(
+            'Không tải được số thông báo:',
+            e
+        );
+
+        return 0;
+    }
+}
+
+
+async function updateNotificationBadge() {
+
+    const badge =
+        document.getElementById('notificationBadge');
+
+    if (!badge) {
+        return;
+    }
+
+    const count =
+        await loadUnreadCount();
+
+    if (count > 0) {
+
+        badge.textContent = `(${count})`;
+
+        badge.style.color = 'red';
+        badge.style.fontWeight = 'bold';
+        badge.style.marginLeft = '5px';
+
+    } else {
+
+        badge.textContent = '';
+    }
+}
+
+
+/* ================= Popup thông báo ================= */
+
+function showNotificationPopup(title, message) {
+
+    const old =
+        document.getElementById('notificationPopup');
+
+    if (old) {
+        old.remove();
+    }
+
+    const div =
+        document.createElement('div');
+
+    div.id = 'notificationPopup';
+
+    div.innerHTML = `
+        <div style="
+            position:fixed;
+            top:20px;
+            right:20px;
+            width:350px;
+            background:white;
+            border:1px solid #ddd;
+            border-radius:10px;
+            padding:18px;
+            box-shadow:0 5px 20px rgba(0,0,0,.2);
+            z-index:99999;
+        ">
+
+            <div style="
+                font-weight:bold;
+                font-size:16px;
+                margin-bottom:8px;
+            ">
+                🔔 ${esc(title)}
+            </div>
+
+            <div style="
+                font-size:14px;
+                line-height:1.5;
+            ">
+                ${esc(message)}
+            </div>
+
+            <button
+                onclick="
+                    document
+                        .getElementById('notificationPopup')
+                        ?.remove()
+                "
+                style="
+                    margin-top:12px;
+                    padding:6px 12px;
+                    border:0;
+                    border-radius:6px;
+                    cursor:pointer;
+                "
+            >
+                Đóng
+            </button>
+
+        </div>
+    `;
+
+    document.body.appendChild(div);
+
+    setTimeout(() => {
+
+        if (div) {
+            div.remove();
+        }
+
+    }, 8000);
+}
+
+
+/* ================= Kiểm tra thông báo mới ================= */
+
+let knownNotificationIds = new Set();
+
+async function checkNewNotifications() {
+
+    if (!token || !user) {
+        return;
+    }
+
+    try {
+
+        const list =
+            await api('/notifications');
+
+        if (!list || list.length === 0) {
+            return;
+        }
+
+
+        /*
+         * Lần đầu mở web:
+         * ghi nhớ tất cả thông báo hiện có.
+         *
+         * Đồng thời nếu có thông báo chưa đọc
+         * thì hiện thông báo mới nhất.
+         */
+
+        if (knownNotificationIds.size === 0) {
+
+            list.forEach(n => {
+                knownNotificationIds.add(n.id);
+            });
+
+            const unread =
+                list.filter(n => !n.read);
+
+            if (unread.length > 0) {
+
+                const newest =
+                    unread[0];
+
+                showNotificationPopup(
+                    newest.title,
+                    newest.message
+                );
+
+                await updateNotificationBadge();
+            }
+
+            return;
+        }
+
+
+        /*
+         * Kiểm tra thông báo mới.
+         */
+
+        for (const n of list) {
+
+            if (!knownNotificationIds.has(n.id)) {
+
+                knownNotificationIds.add(n.id);
+
+                if (!n.read) {
+
+                    showNotificationPopup(
+                        n.title,
+                        n.message
+                    );
+
+                    await updateNotificationBadge();
+                }
+            }
+        }
+
+    } catch (e) {
+
+        console.error(
+            'Không kiểm tra được thông báo mới:',
+            e
+        );
+    }
+}
+
+
+/*
+ * Kiểm tra thông báo mỗi 3 giây.
+ */
+
+setInterval(() => {
+    checkNewNotifications();
+}, 3000);
+
+
+/*
+ * Chạy ngay lần đầu.
+ */
+
+checkNewNotifications();
+
+
+/*
+ * Cập nhật số thông báo chưa đọc
+ * mỗi 3 giây.
+ */
+
+setInterval(() => {
+    updateNotificationBadge();
+}, 3000);
+
+
+/* ================= Heartbeat ================= */
+
+setInterval(async () => {
+
+    if (!token) {
+        return;
+    }
+
+    try {
+
+        await api(
+            '/auth/heartbeat',
+            'POST'
+        );
+
+    } catch (e) {
+
+        console.error(
+            'Heartbeat lỗi:',
+            e
+        );
+    }
+
+}, 30000);
+
+
 /* ================= Khung trang & điều hướng ================= */
+
 function layout() {
+
     const links = [
         ['#/', '🏠 Trang Chủ'],
         ['#/products', '📦 Sản phẩm'],
         ['#/transactions', '🧾 Phiếu nhập/xuất'],
         ['#/lectures', '📚 Bài giảng']
     ];
-    // ADMIN và MANAGER được dùng Danh mục + Nhà cung cấp
-    if (isAdmin() || user?.role === 'MANAGER') {
+
+
+    /*
+     * ADMIN và MANAGER được dùng Danh mục
+     */
+
+    if (
+        isAdmin() ||
+        user?.role === 'MANAGER'
+    ) {
+
         links.push(
-                ['#/categories', '🗂️ Danh mục'],
-                );
+            ['#/categories', '🗂️ Danh mục']
+        );
     }
 
-// Chỉ ADMIN được thấy Người dùng
+
+    /*
+     * Chỉ ADMIN được thấy Người dùng
+     */
+
     if (isAdmin()) {
-        links.push(['#/users', '👥 Người dùng']);
+
+        links.push(
+            ['#/users', '👥 Người dùng']
+        );
     }
 
-    const here = location.hash || '#/';
+
+    const here =
+        location.hash || '#/';
+
+
     document.getElementById('app').innerHTML = `
+
     <header class="topbar">
-    <div class="brand">Wings <b>Up</b> · Kho</div>
-      <nav class="nav">
-        ${links.map(([h, t]) =>
-            `<a href="${h}" class="${here === h ? 'active' : ''}">${t}</a>`
-    ).join('')}
-      </nav>
 
-      <div class="who">
-        <a href="#/profile">
-          ${esc(user.fullName || user.username)}
-          (${esc(user.role)})
-        </a>
+        <div class="brand">
+            Wings <b>Up</b> · Kho
+        </div>
 
-        <a href="#" onclick="logout(); return false;">
-          Đăng xuất
-        </a>
-      </div>
+        <nav class="nav">
+
+            ${links.map(([h, t]) =>
+                `<a
+                    href="${h}"
+                    class="${here === h ? 'active' : ''}"
+                >
+                    ${t}
+                </a>`
+            ).join('')}
+
+        </nav>
+
+
+        <!-- ================= THÔNG BÁO ================= -->
+
+        <div class="notification-box">
+
+            <a href="#/notifications">
+
+                🔔 Thông báo
+
+                <span id="notificationBadge"></span>
+
+            </a>
+
+        </div>
+
+
+        <!-- ================= TÀI KHOẢN ================= -->
+
+        <div class="who">
+
+            <a href="#/profile">
+
+                ${esc(
+                    user.fullName ||
+                    user.username
+                )}
+
+                (${esc(user.role)})
+
+            </a>
+
+
+            <a
+                href="#"
+                onclick="logout(); return false;"
+            >
+                Đăng xuất
+            </a>
+
+        </div>
+
     </header>
 
+
     <main id="content"></main>
-  `;
+
+    `;
+
+
+    /*
+     * Cập nhật số thông báo ngay khi layout tạo xong.
+     */
+
+    updateNotificationBadge();
 }
 
+
+/* ================= Render ================= */
+
 async function render() {
-    if (!token)
+
+    if (!token) {
         return pageLogin();
-    const route = (location.hash || '#/').slice(2);
-    // Chỉ ADMIN được vào trang Người dùng
-    if (route === 'users' && !isAdmin()) {
+    }
+
+
+    const route =
+        (location.hash || '#/')
+            .slice(2);
+
+
+    /*
+     * Chỉ ADMIN được vào trang Người dùng
+     */
+
+    if (
+        route === 'users' &&
+        !isAdmin()
+    ) {
+
         location.hash = '#/';
+
         return;
     }
 
-// ADMIN và MANAGER được vào Danh mục
+
+    /*
+     * ADMIN và MANAGER được vào Danh mục
+     */
+
     if (
-            route === 'categories' &&
-            !(isAdmin() || user?.role === 'MANAGER')
-            ) {
+        route === 'categories' &&
+        !(isAdmin() || user?.role === 'MANAGER')
+    ) {
+
         location.hash = '#/';
+
         return;
     }
+
 
     layout();
+
+
     if (CRUD[route]) {
         return pageCrud(route);
     }
 
+
     switch (route) {
+
         case 'products':
             return pageProducts();
+
         case 'transactions':
             return pageTransactions();
+
         case 'lectures':
             return pageLectures();
+
+        case 'notifications':
+            return pageNotifications();
+
         case 'profile':
             return pageProfile();
+
         default:
             return pageDashboard();
     }
 }
 
+
 /* ================= Đăng nhập / Đăng ký ================= */
 
 let registerMode = false;
+
+
 function pageLogin(msg = '') {
+
     registerMode = false;
+
     document.getElementById('app').innerHTML = `
+
     <div class="login-page">
-      <div class="login-box">
-        <h1>Wings Up – Edu Success</h1>
-        <p>Đăng nhập hệ thống quản lý kho</p>
 
-        ${err(msg)}
+        <div class="login-box">
 
-        <label>
-          Tên đăng nhập
-          <input id="lu" autocomplete="username">
-        </label>
+            <h1>
+                Wings Up – Edu Success
+            </h1>
 
-        <label>
-          Mật khẩu
-          <input id="lp" type="password" autocomplete="current-password">
-        </label>
+            <p>
+                Đăng nhập hệ thống quản lý kho
+            </p>
 
-        <button class="btn" onclick="doLogin()">Đăng nhập</button>
+            ${err(msg)}
 
-        <div class="register-link">
-          Chưa có tài khoản?
-          <button class="btn ghost" onclick="showRegister()">Đăng ký</button>
+            <label>
+
+                Tên đăng nhập
+
+                <input
+                    id="lu"
+                    autocomplete="username"
+                >
+
+            </label>
+
+
+            <label>
+
+                Mật khẩu
+
+                <input
+                    id="lp"
+                    type="password"
+                    autocomplete="current-password"
+                >
+
+            </label>
+
+
+            <button
+                class="btn"
+                onclick="doLogin()"
+            >
+                Đăng nhập
+            </button>
+
+
+            <div class="register-link">
+
+                Chưa có tài khoản?
+
+                <button
+                    class="btn ghost"
+                    onclick="showRegister()"
+                >
+                    Đăng ký
+                </button>
+
+            </div>
+
         </div>
-      </div>
-    </div>`;
-    document.getElementById('lp').addEventListener('keyup', (e) => {
-        if (e.key === 'Enter')
-            doLogin();
-    });
+
+    </div>
+
+    `;
+
+
+    document
+        .getElementById('lp')
+        .addEventListener(
+            'keyup',
+            (e) => {
+
+                if (e.key === 'Enter') {
+                    doLogin();
+                }
+
+            }
+        );
 }
+
 
 function showRegister(msg = '') {
+
     registerMode = true;
+
     document.getElementById('app').innerHTML = `
+
     <div class="login-page">
-      <div class="login-box">
-        <h1>Wings Up – Edu Success</h1>
-        <p>Tạo tài khoản mới</p>
 
-        ${err(msg)}
+        <div class="login-box">
 
-        <label>
-          Tên đăng nhập
-          <input id="ru" autocomplete="username">
-        </label>
+            <h1>
+                Wings Up – Edu Success
+            </h1>
 
-        <label>
-          Mật khẩu
-          <input id="rp" type="password" autocomplete="new-password">
-        </label>
+            <p>
+                Tạo tài khoản mới
+            </p>
 
-        <label>
-          Họ tên
-          <input id="rf" autocomplete="name">
-        </label>
+            ${err(msg)}
 
-        <label>
-          Email
-          <input id="re" type="email" autocomplete="email">
-        </label>
 
-        <button class="btn" onclick="doRegister()">
-          Tạo tài khoản
-        </button>
+            <label>
 
-        <div class="register-link">
-          Đã có tài khoản?
-          <button class="btn ghost" onclick="pageLogin()">
-            Đăng nhập
-          </button>
+                Tên đăng nhập
+
+                <input
+                    id="ru"
+                    autocomplete="username"
+                >
+
+            </label>
+
+
+            <label>
+
+                Mật khẩu
+
+                <input
+                    id="rp"
+                    type="password"
+                    autocomplete="new-password"
+                >
+
+            </label>
+
+
+            <label>
+
+                Họ tên
+
+                <input
+                    id="rf"
+                    autocomplete="name"
+                >
+
+            </label>
+
+
+            <label>
+
+                Email
+
+                <input
+                    id="re"
+                    type="email"
+                    autocomplete="email"
+                >
+
+            </label>
+
+
+            <button
+                class="btn"
+                onclick="doRegister()"
+            >
+                Tạo tài khoản
+            </button>
+
+
+            <div class="register-link">
+
+                Đã có tài khoản?
+
+                <button
+                    class="btn ghost"
+                    onclick="pageLogin()"
+                >
+                    Đăng nhập
+                </button>
+
+            </div>
+
         </div>
-      </div>
-    </div>`;
-    document.getElementById('rp').addEventListener('keyup', (e) => {
-        if (e.key === 'Enter')
-            doRegister();
-    });
+
+    </div>
+
+    `;
+
+
+    document
+        .getElementById('rp')
+        .addEventListener(
+            'keyup',
+            (e) => {
+
+                if (e.key === 'Enter') {
+                    doRegister();
+                }
+
+            }
+        );
 }
 
+
 async function doRegister() {
-    const username = val('ru').trim();
-    const password = val('rp');
-    const fullName = val('rf').trim();
-    const email = val('re').trim();
+
+    const username =
+        val('ru').trim();
+
+    const password =
+        val('rp');
+
+    const fullName =
+        val('rf').trim();
+
+    const email =
+        val('re').trim();
+
+
     if (!username) {
-        showRegister('Tên đăng nhập không được để trống');
+
+        showRegister(
+            'Tên đăng nhập không được để trống'
+        );
+
         return;
     }
 
-    if (!password || password.length < 6) {
-        showRegister('Mật khẩu phải từ 6 ký tự');
+
+    if (
+        !password ||
+        password.length < 6
+    ) {
+
+        showRegister(
+            'Mật khẩu phải từ 6 ký tự'
+        );
+
         return;
     }
+
 
     try {
-        await api('/auth/register', 'POST', {
-            username: username,
-            password: password,
-            fullName: fullName,
-            email: email
-        });
+
+        await api(
+            '/auth/register',
+            'POST',
+            {
+                username: username,
+                password: password,
+                fullName: fullName,
+                email: email
+            }
+        );
+
+
         pageLogin();
-        alert('Tạo tài khoản thành công! Vui lòng đăng nhập.');
+
+        alert(
+            'Tạo tài khoản thành công! Vui lòng đăng nhập.'
+        );
+
     } catch (e) {
+
         showRegister(e.message);
     }
 }
 
+
 async function doLogin() {
-    const username = val('lu').trim();
-    const password = val('lp');
+
+    const username =
+        val('lu').trim();
+
+    const password =
+        val('lp');
+
+
     if (!username) {
-        pageLogin('Tên đăng nhập không được để trống');
+
+        pageLogin(
+            'Tên đăng nhập không được để trống'
+        );
+
         return;
     }
+
 
     if (!password) {
-        pageLogin('Mật khẩu không được để trống');
+
+        pageLogin(
+            'Mật khẩu không được để trống'
+        );
+
         return;
     }
 
+
     try {
-        const data = await api('/auth/login', 'POST', {
-            username: username,
-            password: password
-        });
-        setSession(data.token, data.user);
+
+        const data =
+            await api(
+                '/auth/login',
+                'POST',
+                {
+                    username: username,
+                    password: password
+                }
+            );
+
+
+        setSession(
+            data.token,
+            data.user
+        );
+
+
+        /*
+         * Reset danh sách notification
+         * khi đăng nhập tài khoản mới.
+         */
+
+        knownNotificationIds =
+            new Set();
+
+
         location.hash = '#/';
+
         render();
+
     } catch (e) {
+
         pageLogin(e.message);
     }
 }
 
 
-
 async function logout() {
+
     try {
-        await api('/auth/logout', 'POST');
+
+        await api(
+            '/auth/logout',
+            'POST'
+        );
+
     } catch (e) {
-        console.log('Logout error:', e);
+
+        console.log(
+            'Logout error:',
+            e
+        );
     }
 
+
     clearSession();
-    location.hash = '#/login';
+
+    knownNotificationIds =
+        new Set();
+
+
+    location.hash =
+        '#/login';
+
     render();
 }
 
+
 /* ================= Tổng quan ================= */
+
 async function pageDashboard() {
+
     try {
-        const d = await api('/dashboard');
+
+        const d =
+            await api('/dashboard');
+
+
         draw(`
-            <h1>Trang Chủ Kho</h1>
+
+            <h1>
+                Trang Chủ Kho
+            </h1>
+
 
             <div class="grid">
-                <div class="stat">
-                    <span>Số loại sản phẩm</span>
-                    <strong>${d.totalProducts}</strong>
-                </div>
 
                 <div class="stat">
-                    <span>Tổng số lượng tồn</span>
-                    <strong>${d.totalQuantity}</strong>
-                </div>
 
-                <div class="stat ${d.lowStockCount ? 'alert' : ''}">
-                    <span>Sắp hết hàng</span>
-                    <strong>${d.lowStockCount}</strong>
-                </div>
-
-                <div class="stat">
                     <span>
-                        ${isAdmin()
-                ? 'Phiếu chờ duyệt'
-                : 'Phiếu của tôi đang chờ'}
+                        Số loại sản phẩm
                     </span>
-                    <strong>${d.pendingCount}</strong>
+
+                    <strong>
+                        ${d.totalProducts}
+                    </strong>
+
                 </div>
+
+
+                <div class="stat">
+
+                    <span>
+                        Tổng số lượng tồn
+                    </span>
+
+                    <strong>
+                        ${d.totalQuantity}
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="stat ${d.lowStockCount ? 'alert' : ''}"
+                >
+
+                    <span>
+                        Sắp hết hàng
+                    </span>
+
+                    <strong>
+                        ${d.lowStockCount}
+                    </strong>
+
+                </div>
+
+
+                <div class="stat">
+
+                    <span>
+
+                        ${
+                            isAdmin()
+                            ? 'Phiếu chờ duyệt'
+                            : 'Phiếu của tôi đang chờ'
+                        }
+
+                    </span>
+
+                    <strong>
+                        ${d.pendingCount}
+                    </strong>
+
+                </div>
+
             </div>
 
-            <div class="panel">
-                <h2>Sản phẩm dưới mức tồn tối thiểu</h2>
-
-                ${
-                d.lowStock.length
-                ? `
-                            <div class="table-wrap">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Tên</th>
-                                            <th class="num">Tồn</th>
-                                            <th class="num">Tối thiểu</th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody>
-                                        ${d.lowStock.map(p => `
-                                            <tr>
-                                                <td>${p.id}</td>
-
-                                                <td>
-                                                    ${esc(p.name)}
-                                                </td>
-
-                                                <td class="num low">
-                                                    ${p.quantity}
-                                                </td>
-
-                                                <td class="num">
-                                                    ${p.minQuantity}
-                                                </td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        `
-                : `
-                            <div class="empty">
-                                Không có sản phẩm nào dưới mức tối thiểu.
-                            </div>
-                        `
-                }
-            </div>
 
             <div class="panel">
+
                 <h2>
-                    ${isAdmin()
-                ? 'Phiếu gần đây'
-                : 'Phiếu gần đây của tôi'}
+                    Sản phẩm dưới mức tồn tối thiểu
                 </h2>
 
+
                 ${
-                d.recent.length
-                ? `
-                            <div class="table-wrap">
-                                <table>
-                                    <thead>
+                    d.lowStock.length
+
+                    ? `
+
+                        <div class="table-wrap">
+
+                            <table>
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th>ID</th>
+                                        <th>Tên</th>
+                                        <th class="num">
+                                            Tồn
+                                        </th>
+                                        <th class="num">
+                                            Tối thiểu
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+
+                                <tbody>
+
+                                    ${d.lowStock.map(p => `
+
                                         <tr>
-                                            <th>Thời gian</th>
-                                            <th>Loại</th>
-                                            <th>Sản phẩm</th>
-                                            <th class="num">SL</th>
-                                            <th>Trạng thái</th>
+
+                                            <td>
+                                                ${p.id}
+                                            </td>
+
+                                            <td>
+                                                ${esc(p.name)}
+                                            </td>
+
+                                            <td class="num low">
+                                                ${p.quantity}
+                                            </td>
+
+                                            <td class="num">
+                                                ${p.minQuantity}
+                                            </td>
+
                                         </tr>
-                                    </thead>
 
-                                    <tbody>
-                                        ${d.recent.map(t => `
-                                            <tr>
-                                                <td>
-                                                    ${dt(t.createdAt)}
-                                                </td>
+                                    `).join('')}
 
-                                                <td>
-                                                    <span class="badge ${t.type}">
-                                                        ${t.type === 'IN'
-                            ? 'Nhập'
-                            : 'Xuất'}
-                                                    </span>
-                                                </td>
+                                </tbody>
 
-                                                <td>
-                                                    ${esc(
-                                    t.product?.name ||
-                                    'Sản phẩm đã xóa'
-                                    )}
-                                                </td>
+                            </table>
 
-                                                <td class="num">
-                                                    ${t.quantity}
-                                                </td>
+                        </div>
 
-                                                <td>
-                                                    <span class="badge ${t.status}">
-                                                        ${STATUS[t.status] || t.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        `
-                : `
-                            <div class="empty">
-                                Chưa có phiếu nào.
-                            </div>
-                        `
+                    `
+
+                    : `
+
+                        <div class="empty">
+
+                            Không có sản phẩm nào dưới mức tối thiểu.
+
+                        </div>
+
+                    `
                 }
+
             </div>
+
+
+            <div class="panel">
+
+                <h2>
+
+                    ${
+                        isAdmin()
+                        ? 'Phiếu gần đây'
+                        : 'Phiếu gần đây của tôi'
+                    }
+
+                </h2>
+
+
+                ${
+                    d.recent.length
+
+                    ? `
+
+                        <div class="table-wrap">
+
+                            <table>
+
+                                <thead>
+
+                                    <tr>
+
+                                        <th>Thời gian</th>
+                                        <th>Loại</th>
+                                        <th>Sản phẩm</th>
+                                        <th class="num">SL</th>
+                                        <th>Trạng thái</th>
+
+                                    </tr>
+
+                                </thead>
+
+
+                                <tbody>
+
+                                    ${d.recent.map(t => `
+
+                                        <tr>
+
+                                            <td>
+                                                ${dt(t.createdAt)}
+                                            </td>
+
+
+                                            <td>
+
+                                                <span
+                                                    class="badge ${t.type}"
+                                                >
+
+                                                    ${
+                                                        t.type === 'IN'
+                                                        ? 'Nhập'
+                                                        : 'Xuất'
+                                                    }
+
+                                                </span>
+
+                                            </td>
+
+
+                                            <td>
+
+                                                ${esc(
+                                                    t.product?.name ||
+                                                    'Sản phẩm đã xóa'
+                                                )}
+
+                                            </td>
+
+
+                                            <td class="num">
+                                                ${t.quantity}
+                                            </td>
+
+
+                                            <td>
+
+                                                <span
+                                                    class="badge ${t.status}"
+                                                >
+                                                    ${
+                                                        STATUS[t.status] ||
+                                                        t.status
+                                                    }
+                                                </span>
+
+                                            </td>
+
+                                        </tr>
+
+                                    `).join('')}
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    `
+
+                    : `
+
+                        <div class="empty">
+
+                            Chưa có phiếu nào.
+
+                        </div>
+
+                    `
+                }
+
+            </div>
+
         `);
+
     } catch (e) {
+
         draw(`
-            <h1>Tổng quan kho</h1>
+
+            <h1>
+                Tổng quan kho
+            </h1>
+
             ${err(e.message)}
+
         `);
     }
 }
 
 
 /* ================= Sản phẩm ================= */
+
 let prod = {};
+
+
 async function pageProducts() {
-    prod = {items: [], cats: [], q: '', form: null, editing: null, error: ''};
+
+    prod = {
+        items: [],
+        cats: [],
+        q: '',
+        form: null,
+        editing: null,
+        error: ''
+    };
+
+
     try {
-        prod.cats = await api('/categories');
+
+        prod.cats =
+            await api('/categories');
+
     } catch (e) {
-        prod.error = e.message;
+
+        prod.error =
+            e.message;
     }
+
 
     prodLoad();
 }
+
+
 async function prodLoad() {
+
     try {
-        prod.items = await api('/products' + (prod.q ? '?q=' + encodeURIComponent(prod.q) : ''));
+
+        prod.items =
+            await api(
+                '/products' +
+                (
+                    prod.q
+                    ? '?q=' +
+                      encodeURIComponent(prod.q)
+                    : ''
+                )
+            );
+
     } catch (e) {
-        prod.error = e.message;
+
+        prod.error =
+            e.message;
     }
+
+
     prodDraw();
 }
 
+
 function prodSearch() {
-    prod.q = val('q').trim();
+
+    prod.q =
+        val('q').trim();
+
     prod.error = '';
+
     prodLoad();
 }
 
+
 function prodAdd() {
+
     prod.editing = null;
+
     prod.error = '';
+
     prod.form = {
         name: '',
         unit: '',
         quantity: '',
         categoryId: ''
     };
+
     prodDraw();
 }
 
+
 function prodEdit(id) {
-    const p = prod.items.find((x) => x.id === id);
-    if (!p)
+
+    const p =
+        prod.items.find(
+            (x) => x.id === id
+        );
+
+    if (!p) {
         return;
+    }
+
+
     prod.editing = id;
+
     prod.error = '';
+
     prod.form = {
         name: p.name || '',
         unit: p.unit || '',
         quantity: p.quantity || 0,
-        categoryId: p.category ? p.category.id : ''
+        categoryId:
+            p.category
+            ? p.category.id
+            : ''
     };
+
     prodDraw();
 }
 
+
 function prodCancel() {
+
     prod.form = null;
+
     prod.error = '';
+
     prodDraw();
 }
 
 
 async function prodSave() {
-    const name = val('p_name').trim();
-    const unit = val('p_unit').trim();
-    const categoryId = val('p_cat').trim();
+
+    const name =
+        val('p_name').trim();
+
+    const unit =
+        val('p_unit').trim();
+
+    const categoryId =
+        val('p_cat').trim();
+
+
     let quantity = 0;
+
+
     if (!prod.editing) {
-        const quantityValue = val('p_qty').trim();
+
+        const quantityValue =
+            val('p_qty').trim();
+
+
         if (!quantityValue) {
-            prod.error = 'Tồn kho bắt buộc phải nhập';
+
+            prod.error =
+                'Tồn kho bắt buộc phải nhập';
+
             prod.form = {
                 name,
                 unit,
                 quantity: '',
                 categoryId
             };
+
             prodDraw();
+
             return;
         }
 
-        quantity = Number(quantityValue);
-        if (!Number.isInteger(quantity) || quantity <= 0) {
-            prod.error = 'Tồn kho phải lớn hơn 0';
+
+        quantity =
+            Number(quantityValue);
+
+
+        if (
+            !Number.isInteger(quantity) ||
+            quantity <= 0
+        ) {
+
+            prod.error =
+                'Tồn kho phải lớn hơn 0';
+
             prod.form = {
                 name,
                 unit,
                 quantity: quantityValue,
                 categoryId
             };
+
             prodDraw();
+
             return;
         }
     }
 
+
     if (!name) {
-        prod.error = 'Tên sản phẩm không được để trống';
+
+        prod.error =
+            'Tên sản phẩm không được để trống';
+
         prod.form = {
             name,
             unit,
-            quantity: prod.editing ? 0 : quantity,
+            quantity:
+                prod.editing
+                ? 0
+                : quantity,
             categoryId
         };
+
         prodDraw();
+
         return;
     }
 
-    if (!/^[a-zA-ZÀ-ỹ0-9\s]+$/.test(name)) {
-        prod.error = 'Tên sản phẩm không được có ký tự đặc biệt';
+
+    if (
+        !/^[a-zA-ZÀ-ỹ0-9\s]+$/.test(name)
+    ) {
+
+        prod.error =
+            'Tên sản phẩm không được có ký tự đặc biệt';
+
         prod.form = {
             name,
             unit,
-            quantity: prod.editing ? 0 : quantity,
+            quantity:
+                prod.editing
+                ? 0
+                : quantity,
             categoryId
         };
+
         prodDraw();
+
         return;
     }
+
 
     if (!unit) {
-        prod.error = 'Đơn vị không được để trống';
+
+        prod.error =
+            'Đơn vị không được để trống';
+
         prod.form = {
             name,
             unit,
-            quantity: prod.editing ? 0 : quantity,
+            quantity:
+                prod.editing
+                ? 0
+                : quantity,
             categoryId
         };
+
         prodDraw();
+
         return;
     }
 
-    if (!/^[a-zA-ZÀ-ỹ0-9\s]+$/.test(unit)) {
-        prod.error = 'Đơn vị không được có ký tự đặc biệt';
+
+    if (
+        !/^[a-zA-ZÀ-ỹ0-9\s]+$/.test(unit)
+    ) {
+
+        prod.error =
+            'Đơn vị không được có ký tự đặc biệt';
+
         prod.form = {
             name,
             unit,
-            quantity: prod.editing ? 0 : quantity,
+            quantity:
+                prod.editing
+                ? 0
+                : quantity,
             categoryId
         };
+
         prodDraw();
+
         return;
     }
+
 
     if (!categoryId) {
-        prod.error = 'Vui lòng chọn danh mục';
+
+        prod.error =
+            'Vui lòng chọn danh mục';
+
         prod.form = {
             name,
             unit,
-            quantity: prod.editing ? 0 : quantity,
+            quantity:
+                prod.editing
+                ? 0
+                : quantity,
             categoryId
         };
+
         prodDraw();
+
         return;
     }
 
+
     const body = {
+
         name: name,
+
         unit: unit,
+
         minQuantity: 10,
-        quantity: prod.editing ? 0 : quantity,
+
+        quantity:
+            prod.editing
+            ? 0
+            : quantity,
+
         category: {
             id: Number(categoryId)
         }
     };
+
+
     try {
+
         await api(
-                prod.editing
-                ? '/products/' + prod.editing
-                : '/products',
-                prod.editing ? 'PUT' : 'POST',
-                body
-                );
+
+            prod.editing
+            ? '/products/' +
+              prod.editing
+            : '/products',
+
+            prod.editing
+            ? 'PUT'
+            : 'POST',
+
+            body
+
+        );
+
+
         prod.form = null;
+
         prod.error = '';
+
         await prodLoad();
+
     } catch (e) {
-        prod.error = e.message;
+
+        prod.error =
+            e.message;
+
         prod.form = {
             name,
             unit,
-            quantity: prod.editing ? 0 : quantity,
+            quantity:
+                prod.editing
+                ? 0
+                : quantity,
             categoryId
         };
+
         prodDraw();
     }
 }
 
 
-
-
 async function prodDelete(id) {
-    if (!confirm('Bạn có chắc muốn xóa sản phẩm này?'))
+
+    if (
+        !confirm(
+            'Bạn có chắc muốn xóa sản phẩm này?'
+        )
+    ) {
         return;
+    }
+
+
     try {
-        await api('/products/' + id, 'DELETE');
-        alert('✅ Đã xóa sản phẩm thành công!');
+
+        await api(
+            '/products/' + id,
+            'DELETE'
+        );
+
+        alert(
+            '✅ Đã xóa sản phẩm thành công!'
+        );
+
         await prodLoad();
+
     } catch (e) {
-        alert('❌ ' + e.message);
+
+        alert(
+            '❌ ' + e.message
+        );
     }
 }
 
 
-
 function prodFormHtml() {
-    const f = prod.form;
-    const opt = (list, selected) =>
+
+    const f =
+        prod.form;
+
+
+    const opt = (
+        list,
+        selected
+    ) =>
+
         '<option value="">— Chưa chọn —</option>' +
-                list.map(x =>
-                        `<option value="${x.id}" ${String(x.id) === String(selected) ? 'selected' : ''}>
+
+        list.map(x =>
+
+            `<option
+                value="${x.id}"
+                ${
+                    String(x.id) ===
+                    String(selected)
+                    ? 'selected'
+                    : ''
+                }
+            >
                 ${esc(x.name)}
             </option>`
-                ).join('');
+
+        ).join('');
+
+
     return `
+
         <div class="panel">
-            <h2>${prod.editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</h2>
+
+            <h2>
+                ${
+                    prod.editing
+                    ? 'Sửa sản phẩm'
+                    : 'Thêm sản phẩm'
+                }
+            </h2>
+
 
             <div class="form">
 
+
                 <label>
+
                     Tên sản phẩm
+
                     <input
                         id="p_name"
                         value="${esc(f.name || '')}"
                         placeholder="VD: Máy tính bảng"
                     >
+
                 </label>
 
+
                 <label>
+
                     Đơn vị
+
                     <input
                         id="p_unit"
                         value="${esc(f.unit || '')}"
                         placeholder="VD: Cái, Bộ, Máy, Thùng"
                     >
+
                 </label>
 
+
                 ${
-            prod.editing
-            ? ''
-            : `
+                    prod.editing
+
+                    ? ''
+
+                    : `
+
                         <label>
+
                             Tồn Kho
+
                             <input
                                 id="p_qty"
                                 type="number"
@@ -762,370 +1783,1003 @@ function prodFormHtml() {
                                 value="${esc(f.quantity ?? '')}"
                                 placeholder="VD: 50"
                             >
+
                         </label>
+
                     `
-            }
+                }
+
 
                 <label>
+
                     Danh mục
+
                     <select id="p_cat">
-                        ${opt(prod.cats, f.categoryId)}
+
+                        ${opt(
+                            prod.cats,
+                            f.categoryId
+                        )}
+
                     </select>
+
                 </label>
+
 
             </div>
 
-            <div class="actions" style="margin-top:12px">
-                <button class="btn" onclick="prodSave()">
+
+            <div
+                class="actions"
+                style="margin-top:12px"
+            >
+
+                <button
+                    class="btn"
+                    onclick="prodSave()"
+                >
                     Lưu sản phẩm
                 </button>
 
-                <button class="btn ghost" onclick="prodCancel()">
+
+                <button
+                    class="btn ghost"
+                    onclick="prodCancel()"
+                >
                     Hủy
                 </button>
+
             </div>
+
         </div>
+
     `;
 }
 
 
-
 function prodDraw() {
-    const admin = isAdmin();
-    const manager = user?.role === 'MANAGER';
-    const canManage = admin || manager;
+
+    const admin =
+        isAdmin();
+
+    const manager =
+        user?.role === 'MANAGER';
+
+    const canManage =
+        admin || manager;
+
+
     draw(`
-        <h1>Sản phẩm</h1>
+
+        <h1>
+            Sản phẩm
+        </h1>
+
 
         ${err(prod.error)}
 
-        <div class="toolbar">  
-    <input  
-        id="q"  
-        placeholder="🔍 Nhập tên sản phẩm..."  
-        value="${esc(prod.q)}" 
-        style="min-width:280px;" 
-    >  
 
-    <button  
-        class="btn"  
-        onclick="prodSearch()" 
-    >  
-        🔍 Tìm kiếm  
-    </button>  
+        <div class="toolbar">
 
-    ${
-            canManage
-            ? '<button class="btn" onclick="prodAdd()">Thêm sản phẩm</button>'
+            <input
+                id="q"
+                placeholder="🔍 Nhập tên sản phẩm..."
+                value="${esc(prod.q)}"
+                style="min-width:280px;"
+            >
+
+
+            <button
+                class="btn"
+                onclick="prodSearch()"
+            >
+                🔍 Tìm kiếm
+            </button>
+
+
+            ${
+                canManage
+
+                ? `
+                    <button
+                        class="btn"
+                        onclick="prodAdd()"
+                    >
+                        Thêm sản phẩm
+                    </button>
+                `
+
+                : ''
+            }
+
+        </div>
+
+
+        ${
+            prod.form
+            ? prodFormHtml()
             : ''
-            }  
-</div>
+        }
 
-        ${prod.form ? prodFormHtml() : ''}
 
         <div class="panel table-wrap">
+
             ${
-            prod.items.length
-            ? `
-                        <table>
-                            <thead>
+                prod.items.length
+
+                ? `
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+
+                                <th>ID</th>
+                                <th>Tên</th>
+                                <th>Danh mục</th>
+                                <th>Đơn vị</th>
+                                <th class="num">
+                                    Tồn Kho
+                                </th>
+
+                                ${
+                                    canManage
+                                    ? '<th></th>'
+                                    : ''
+                                }
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody>
+
+                            ${prod.items.map(p => `
+
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Tên</th>
-                                    <th>Danh mục</th>
-                                    <th>Đơn vị</th>
-                                    <th class="num">Tồn Kho</th>
-                                    ${canManage ? '<th></th>' : ''}
+
+                                    <td>
+                                        ${p.id}
+                                    </td>
+
+
+                                    <td>
+                                        ${esc(p.name)}
+                                    </td>
+
+
+                                    <td>
+                                        ${esc(
+                                            p.category
+                                            ? p.category.name
+                                            : ''
+                                        )}
+                                    </td>
+
+
+                                    <td>
+                                        ${esc(
+                                            p.unit || ''
+                                        )}
+                                    </td>
+
+
+                                    <td
+                                        class="
+                                            num
+                                            ${
+                                                p.quantity <=
+                                                p.minQuantity
+                                                ? 'low'
+                                                : ''
+                                            }
+                                        "
+                                    >
+                                        ${p.quantity}
+                                    </td>
+
+
+                                    ${
+                                        canManage
+
+                                        ? `
+
+                                            <td>
+
+                                                <div class="actions">
+
+                                                    <button
+                                                        class="
+                                                            btn
+                                                            ghost
+                                                            small
+                                                        "
+                                                        onclick="
+                                                            prodEdit(${p.id})
+                                                        "
+                                                    >
+                                                        Sửa
+                                                    </button>
+
+
+                                                    <button
+                                                        class="
+                                                            btn
+                                                            danger
+                                                            small
+                                                        "
+                                                        onclick="
+                                                            prodDelete(${p.id})
+                                                        "
+                                                    >
+                                                        Xóa
+                                                    </button>
+
+                                                </div>
+
+                                            </td>
+
+                                        `
+
+                                        : ''
+                                    }
+
                                 </tr>
-                            </thead>
 
-                            <tbody>
-    ${prod.items.map(p => `
-        <tr>
-            <td>${p.id}</td>
-            <td>${esc(p.name)}</td>
-            <td>${esc(p.category ? p.category.name : '')}</td>
-            <td>${esc(p.unit || '')}</td>
-            <td class="num ${p.quantity <= p.minQuantity ? 'low' : ''}">
-                ${p.quantity}
-            </td>
-            ${canManage ? `
-                <td>
-                    <div class="actions">
-                        <button
-                            class="btn ghost small"
-                            onclick="prodEdit(${p.id})">
-                            Sửa
-                        </button>
+                            `).join('')}
 
-                        <button
-                            class="btn danger small"
-                            onclick="prodDelete(${p.id})">
-                            Xóa
-                        </button>
+                        </tbody>
+
+                    </table>
+
+                `
+
+                : `
+                    <div class="empty">
+                        Chưa có sản phẩm nào.
                     </div>
-                </td>
-            ` : ''}
-        </tr>
-    `).join('')}
-</tbody>
-                        </table>
-                    `
-            : '<div class="empty">Chưa có sản phẩm nào.</div>'
+                `
             }
+
         </div>
+
     `);
-    const q = document.getElementById('q');
+
+
+    const q =
+        document.getElementById('q');
+
+
     if (q) {
-        q.addEventListener('keyup', e => {
-            if (e.key === 'Enter') {
-                prodSearch();
+
+        q.addEventListener(
+            'keyup',
+            e => {
+
+                if (e.key === 'Enter') {
+                    prodSearch();
+                }
+
             }
-        });
+        );
     }
 }
 
+
 /* ================= Phiếu nhập/xuất ================= */
+
 let tx = {};
+
+
 async function pageTransactions() {
+
     tx = {
+
         items: [],
+
         products: [],
+
         form: {
             productId: '',
             type: 'IN',
             quantity: 1,
             note: ''
         },
+
         error: '',
         success: '',
+
         fromDate: '',
         toDate: ''
     };
 
+
     txLoad();
 }
 
-async function txLoad() {
-    try {
-        tx.items = await api('/transactions');
-        tx.products = await api('/products');
-    } catch (e) {
-        tx.error = e.message;
-    }
-    txDraw();
-}
 
-async function txCreate() {
-    tx.form = {productId: val('t_prod'), type: val('t_type'), quantity: parseInt(val('t_qty')) || 0, note: val('t_note')};
-    tx.error = '';
-    tx.success = '';
+/* ================= Thông báo ================= */
+
+async function pageNotifications() {
+
+    let list = [];
+
+
     try {
-        await api('/transactions', 'POST', tx.form);
-        tx.success = canManageWarehouse()
-                ? 'Đã tạo phiếu và cập nhật tồn kho'
-                : 'Đã gửi phiếu, chờ quản trị viên duyệt';
-        tx.form = {productId: '', type: tx.form.type, quantity: 1, note: ''};
-        txLoad();
+
+        list =
+            await api('/notifications');
+
     } catch (e) {
-        tx.error = e.message;
-        txDraw();
-    }
-}
-async function txCreate() {
-    tx.form = {
-        productId: val('t_prod'),
-        type: val('t_type'),
-        quantity: parseInt(val('t_qty')) || 0,
-        note: val('t_note')
-    };
-    tx.error = '';
-    tx.success = '';
-    // USER chỉ được order tối đa 10 sản phẩm
-    if (user?.role === 'USER' && tx.form.quantity > 10) {
-        tx.error = 'Người dùng chỉ được order tối đa 10 sản phẩm mỗi phiếu.';
-        txDraw();
+
+        draw(`
+
+            <h1>
+                Thông báo
+            </h1>
+
+            ${err(e.message)}
+
+        `);
+
         return;
     }
 
-// Số lượng phải lớn hơn 0
-    if (tx.form.quantity < 1) {
-        tx.error = 'Số lượng phải lớn hơn 0.';
-        txDraw();
-        return;
-    }
-
-    try {
-        await api('/transactions', 'POST', tx.form);
-        tx.success = canManageWarehouse()
-                ? 'Đã tạo phiếu và cập nhật tồn kho'
-                : 'Đã gửi phiếu, chờ quản trị viên duyệt';
-        tx.form = {
-            productId: '',
-            type: tx.form.type,
-            quantity: 1,
-            note: ''
-        };
-        txLoad();
-    } catch (e) {
-        tx.error = e.message;
-        txDraw();
-    }
-}
-
-
-async function txAct(path, method, message) {
-    tx.error = '';
-    tx.success = '';
-    try {
-        await api(path, method);
-        tx.success = message;
-    } catch (e) {
-        tx.error = e.message;
-    }
-    txLoad();
-}
-
-const txApprove = (id) => txAct('/transactions/' + id + '/approve', 'POST', 'Đã duyệt phiếu');
-const txReject = (id) => txAct('/transactions/' + id + '/reject', 'POST', 'Đã từ chối phiếu');
-const txCancel = (id) => {
-    if (confirm('Hủy phiếu này?'))
-        txAct('/transactions/' + id, 'DELETE', 'Đã hủy phiếu');
-};
-const txCanCancel = (t) =>
-    t.status === 'PENDING'
-            && (
-                    isAdmin()
-                    || isManager()
-                    || (t.createdBy && t.createdBy.id === user.id)
-                    );
-
-function txFilterDate() {
-    const from = document.getElementById('tx_from_date');
-    const to = document.getElementById('tx_to_date');
-
-    tx.fromDate = from ? from.value : '';
-    tx.toDate = to ? to.value : '';
-
-    txDraw();
-}
-
-
-function txDraw() {
-
-    const f = tx.form;
-
-    const filteredItems = tx.items.filter(t => {
-
-        if (!tx.fromDate && !tx.toDate) {
-            return true;
-        }
-
-        const date = new Date(t.createdAt);
-
-        if (isNaN(date.getTime())) {
-            return false;
-        }
-
-        const itemDate =
-                date.getFullYear() +
-                '-' +
-                String(date.getMonth() + 1).padStart(2, '0') +
-                '-' +
-                String(date.getDate()).padStart(2, '0');
-
-        if (tx.fromDate && itemDate < tx.fromDate) {
-            return false;
-        }
-
-        if (tx.toDate && itemDate > tx.toDate) {
-            return false;
-        }
-
-        return true;
-    });
 
     draw(`
 
-    <h1>Phiếu nhập/xuất kho</h1>
-
-    ${err(tx.error)}
-    ${okMsg(tx.success)}
-
-    <div class="panel">
-
-        <h2>Tạo phiếu mới</h2>
-
-        <div class="form">
-
-            <label>
-                Loại phiếu
-
-                <select id="t_type">
-
-                    <option
-                        value="IN"
-                        ${f.type === 'IN' ? 'selected' : ''}
-                    >
-                        Nhập kho
-                    </option>
-
-                    <option
-                        value="OUT"
-                        ${f.type === 'OUT' ? 'selected' : ''}
-                    >
-                        Xuất kho
-                    </option>
-
-                </select>
-
-            </label>
+        <h1>
+            🔔 Thông báo
+        </h1>
 
 
-            <label>
-                Sản phẩm
+        <div style="margin-bottom:15px">
 
-                <select id="t_prod">
+            <button
+                class="btn"
+                onclick="readAllNotifications()"
+            >
+                Đánh dấu tất cả đã đọc
+            </button>
 
-                    <option value="">
-                        — Chọn sản phẩm —
-                    </option>
+        </div>
 
-                    ${tx.products.map((p) => `
+
+        ${
+            list.length === 0
+
+            ? '<p>Không có thông báo.</p>'
+
+            : list.map(n => `
+
+                <div
+                    class="card"
+                    style="
+                        margin-bottom:10px;
+                        padding:15px;
+                        border-left:4px solid
+                        ${
+                            n.read
+                            ? '#ccc'
+                            : '#2196f3'
+                        };
+                    "
+                >
+
+                    <b>
+                        ${esc(n.title)}
+                    </b>
+
+
+                    <div style="margin-top:5px">
+
+                        ${esc(n.message)}
+
+                    </div>
+
+
+                    <small>
+
+                        ${dt(n.createdAt)}
+
+                    </small>
+
+
+                    ${
+                        !n.read
+
+                        ? `
+
+                            <div style="margin-top:8px">
+
+                                <button
+                                    class="btn"
+                                    onclick="
+                                        readNotification(${n.id})
+                                    "
+                                >
+                                    Đã đọc
+                                </button>
+
+                            </div>
+
+                        `
+
+                        : ''
+                    }
+
+                </div>
+
+            `).join('')
+        }
+
+    `);
+
+
+    updateNotificationBadge();
+}
+
+
+async function readNotification(id) {
+
+    try {
+
+        await api(
+            '/notifications/' +
+            id +
+            '/read',
+            'POST'
+        );
+
+
+        await updateNotificationBadge();
+
+        pageNotifications();
+
+    } catch (e) {
+
+        alert(e.message);
+    }
+}
+
+
+async function readAllNotifications() {
+
+    try {
+
+        await api(
+            '/notifications/read-all',
+            'POST'
+        );
+
+
+        await updateNotificationBadge();
+
+        pageNotifications();
+
+    } catch (e) {
+
+        alert(e.message);
+    }
+}
+
+
+/* ================= Load phiếu ================= */
+
+async function txLoad() {
+
+    try {
+
+        tx.items =
+            await api('/transactions');
+
+        tx.products =
+            await api('/products');
+
+    } catch (e) {
+
+        tx.error =
+            e.message;
+    }
+
+
+    txDraw();
+}
+
+
+/* ================= Tạo phiếu ================= */
+
+async function txCreate() {
+
+    tx.form = {
+
+        productId:
+            val('t_prod'),
+
+        type:
+            val('t_type'),
+
+        quantity:
+            parseInt(
+                val('t_qty')
+            ) || 0,
+
+        note:
+            val('t_note')
+    };
+
+
+    tx.error = '';
+    tx.success = '';
+
+
+    if (!tx.form.productId) {
+
+        tx.error =
+            'Vui lòng chọn sản phẩm.';
+
+        txDraw();
+
+        return;
+    }
+
+
+    if (tx.form.quantity < 1) {
+
+        tx.error =
+            'Số lượng phải lớn hơn 0.';
+
+        txDraw();
+
+        return;
+    }
+
+
+    /*
+     * USER chỉ được xuất tối đa 10 sản phẩm.
+     */
+
+    if (
+        user?.role === 'USER' &&
+        tx.form.type === 'OUT' &&
+        tx.form.quantity > 10
+    ) {
+
+        tx.error =
+            'Người dùng chỉ được yêu cầu xuất tối đa 10 sản phẩm mỗi phiếu.';
+
+        txDraw();
+
+        return;
+    }
+
+
+    try {
+
+        const saved =
+            await api(
+                '/transactions',
+                'POST',
+                tx.form
+            );
+
+
+        /*
+         * Thông báo cho người vừa tạo phiếu.
+         */
+
+        showNotificationPopup(
+            'Tạo phiếu thành công',
+            'Phiếu ' +
+            (saved.id || '') +
+            ' đã được tạo thành công.'
+        );
+
+
+        await updateNotificationBadge();
+
+
+        if (user?.role === 'ADMIN') {
+
+            tx.success =
+                'Đã tạo phiếu và cập nhật tồn kho.';
+
+        } else if (
+            tx.form.type === 'OUT'
+        ) {
+
+            tx.success =
+                'Đã gửi yêu cầu xuất kho. Vui lòng chờ ADMIN duyệt.';
+
+        } else {
+
+            tx.success =
+                'Đã gửi phiếu, chờ ADMIN duyệt.';
+        }
+
+
+        tx.form = {
+
+            productId: '',
+
+            type:
+                tx.form.type,
+
+            quantity: 1,
+
+            note: ''
+        };
+
+
+        await txLoad();
+
+    } catch (e) {
+
+        tx.error =
+            e.message;
+
+        txDraw();
+    }
+}
+
+
+/* ================= Duyệt / Từ chối / Hủy ================= */
+
+async function txAct(
+    path,
+    method,
+    message
+) {
+
+    tx.error = '';
+    tx.success = '';
+
+
+    try {
+
+        await api(
+            path,
+            method
+        );
+
+        tx.success =
+            message;
+
+    } catch (e) {
+
+        tx.error =
+            e.message;
+    }
+
+
+    txLoad();
+}
+
+
+const txApprove = (id) =>
+    txAct(
+        '/transactions/' +
+        id +
+        '/approve',
+        'POST',
+        'Đã duyệt phiếu'
+    );
+
+
+const txReject = (id) =>
+    txAct(
+        '/transactions/' +
+        id +
+        '/reject',
+        'POST',
+        'Đã từ chối phiếu'
+    );
+
+
+const txCancel = (id) => {
+
+    if (
+        confirm('Hủy phiếu này?')
+    ) {
+
+        txAct(
+            '/transactions/' +
+            id,
+            'DELETE',
+            'Đã hủy phiếu'
+        );
+    }
+};
+
+
+const txCanCancel = (t) =>
+
+    t.status === 'PENDING' &&
+
+    (
+        isAdmin() ||
+        isManager() ||
+        (
+            t.createdBy &&
+            t.createdBy.id === user.id
+        )
+    );
+
+
+function txFilterDate() {
+
+    const from =
+        document.getElementById(
+            'tx_from_date'
+        );
+
+    const to =
+        document.getElementById(
+            'tx_to_date'
+        );
+
+
+    tx.fromDate =
+        from
+        ? from.value
+        : '';
+
+
+    tx.toDate =
+        to
+        ? to.value
+        : '';
+
+
+    txDraw();
+}
+
+
+/* ================= Vẽ phiếu ================= */
+
+function txDraw() {
+
+    const f =
+        tx.form;
+
+
+    const filteredItems =
+        tx.items.filter(t => {
+
+            if (
+                !tx.fromDate &&
+                !tx.toDate
+            ) {
+
+                return true;
+            }
+
+
+            const date =
+                new Date(
+                    t.createdAt
+                );
+
+
+            if (
+                isNaN(
+                    date.getTime()
+                )
+            ) {
+
+                return false;
+            }
+
+
+            const itemDate =
+
+                date.getFullYear() +
+
+                '-' +
+
+                String(
+                    date.getMonth() + 1
+                ).padStart(2, '0') +
+
+                '-' +
+
+                String(
+                    date.getDate()
+                ).padStart(2, '0');
+
+
+            if (
+                tx.fromDate &&
+                itemDate < tx.fromDate
+            ) {
+
+                return false;
+            }
+
+
+            if (
+                tx.toDate &&
+                itemDate > tx.toDate
+            ) {
+
+                return false;
+            }
+
+
+            return true;
+        });
+
+
+    draw(`
+
+        <h1>
+            Phiếu nhập/xuất kho
+        </h1>
+
+
+        ${err(tx.error)}
+
+        ${okMsg(tx.success)}
+
+
+        <div class="panel">
+
+            <h2>
+                Tạo phiếu mới
+            </h2>
+
+
+            <div class="form">
+
+
+                <label>
+
+                    Loại phiếu
+
+                    <select id="t_type">
 
                         <option
-                            value="${p.id}"
-                            ${String(p.id) === String(f.productId) ? 'selected' : ''}
+                            value="IN"
+                            ${
+                                f.type === 'IN'
+                                ? 'selected'
+                                : ''
+                            }
                         >
-                            ID ${p.id} – ${esc(p.name)} (tồn ${p.quantity})
+                            Nhập kho
                         </option>
 
-                    `).join('')}
 
-                </select>
+                        <option
+                            value="OUT"
+                            ${
+                                f.type === 'OUT'
+                                ? 'selected'
+                                : ''
+                            }
+                        >
+                            Xuất kho
+                        </option>
 
-            </label>
+                    </select>
+
+                </label>
 
 
-            <label>
-                Số lượng
+                <label>
+
+                    Sản phẩm
+
+                    <select id="t_prod">
+
+                        <option value="">
+
+                            — Chọn sản phẩm —
+
+                        </option>
+
+
+                        ${tx.products.map((p) => `
+
+                            <option
+                                value="${p.id}"
+                                ${
+                                    String(p.id) ===
+                                    String(f.productId)
+                                    ? 'selected'
+                                    : ''
+                                }
+                            >
+
+                                ID ${p.id} –
+                                ${esc(p.name)}
+                                (tồn ${p.quantity})
+
+                            </option>
+
+                        `).join('')}
+
+                    </select>
+
+                </label>
+
+
+                <label>
+
+                    Số lượng
+
+                    <input
+                        id="t_qty"
+                        type="number"
+                        min="1"
+                        value="${esc(f.quantity)}"
+                    >
+
+                </label>
+
+
+                <label>
+
+                    Ghi chú
+
+                    <input
+                        id="t_note"
+                        value="${esc(f.note)}"
+                    >
+
+                </label>
+
+
+                <button
+                    class="btn"
+                    onclick="txCreate()"
+                >
+                    Tạo phiếu
+                </button>
+
+
+            </div>
+
+        </div>
+
+
+        <!-- LỌC LỊCH SỬ -->
+
+        <div
+            style="
+                display:flex;
+                align-items:end;
+                gap:10px;
+                margin:15px 0;
+                flex-wrap:wrap;
+            "
+        >
+
+            <label style="margin:0;">
+
+                Từ ngày
 
                 <input
-                    id="t_qty"
-                    type="number"
-                    min="1"
-                    value="${esc(f.quantity)}"
+                    type="date"
+                    id="tx_from_date"
+                    value="${tx.fromDate || ''}"
+                    style="width:150px;"
                 >
 
             </label>
 
 
-            <label>
-                Ghi chú
+            <label style="margin:0;">
+
+                Đến ngày
 
                 <input
-                    id="t_note"
-                    value="${esc(f.note)}"
+                    type="date"
+                    id="tx_to_date"
+                    value="${tx.toDate || ''}"
+                    style="width:150px;"
                 >
 
             </label>
@@ -1133,583 +2787,958 @@ function txDraw() {
 
             <button
                 class="btn"
-                onclick="txCreate()"
+                onclick="txFilterDate()"
+                style="height:38px;"
             >
-                Tạo phiếu
+                🔍 Lọc
             </button>
 
         </div>
 
-    </div>
+
+        <!-- LỊCH SỬ PHIẾU -->
+
+        <div class="panel table-wrap">
+
+            ${
+                filteredItems.length
+
+                ? `
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+
+                                <th>Thời gian</th>
+
+                                <th>Loại</th>
+
+                                <th>Sản phẩm</th>
+
+                                <th class="num">
+                                    SL
+                                </th>
+
+                                <th>Người tạo</th>
+
+                                <th>Ghi chú</th>
+
+                                <th>Trạng thái</th>
+
+                                <th></th>
+
+                            </tr>
+
+                        </thead>
 
 
-    <!-- LỌC LỊCH SỬ -->
+                        <tbody>
 
-    <div style="
-    display:flex;
-    align-items:end;
-    gap:10px;
-    margin:15px 0;
-    flex-wrap:wrap;
-">
+                            ${filteredItems.map((t) => `
 
-    <label style="margin:0;">
-        Từ ngày
+                                <tr>
 
-        <input
-            type="date"
-            id="tx_from_date"
-            value="${tx.fromDate || ''}"
-            style="width:150px;"
-        >
-    </label>
+                                    <td>
+                                        ${dt(t.createdAt)}
+                                    </td>
 
 
-    <label style="margin:0;">
-        Đến ngày
+                                    <td>
 
-        <input
-            type="date"
-            id="tx_to_date"
-            value="${tx.toDate || ''}"
-            style="width:150px;"
-        >
-    </label>
-
-
-    <button
-        class="btn"
-        onclick="txFilterDate()"
-        style="height:38px;"
-    >
-        🔍 Lọc
-    </button>
-
-</div>
-
-
-    <!-- LỊCH SỬ PHIẾU -->
-
-    <div class="panel table-wrap">
-
-        ${
-            filteredItems.length
-
-            ? `
-
-            <table>
-
-                <thead>
-
-                    <tr>
-
-                        <th>Thời gian</th>
-
-                        <th>Loại</th>
-
-                        <th>Sản phẩm</th>
-
-                        <th class="num">
-                            SL
-                        </th>
-
-                        <th>Người tạo</th>
-
-                        <th>Ghi chú</th>
-
-                        <th>Trạng thái</th>
-
-                        <th></th>
-
-                    </tr>
-
-                </thead>
-
-
-                <tbody>
-
-                    ${filteredItems.map((t) => `
-
-                        <tr>
-
-                            <td>
-                                ${dt(t.createdAt)}
-                            </td>
-
-
-                            <td>
-
-                                <span class="badge ${t.type}">
-                                    ${t.type === 'IN' ? 'Nhập' : 'Xuất'}
-                                </span>
-
-                            </td>
-
-
-                            <td>
-                                ${esc(
-                        t.product?.name ||
-                        'Sản phẩm đã xóa'
-                        )}
-                            </td>
-
-
-                            <td class="num">
-                                ${t.quantity}
-                            </td>
-
-
-                            <td>
-                                ${esc(
-                        t.createdBy
-                        ? (
-                                t.createdBy.fullName ||
-                                t.createdBy.username
-                                )
-                        : ''
-                        )}
-                            </td>
-
-
-                            <td>
-                                ${esc(t.note || '')}
-                            </td>
-
-
-                            <td>
-
-                                <span class="badge ${t.status}">
-                                    ${STATUS[t.status] || t.status}
-                                </span>
-
-                            </td>
-
-
-                            <td>
-
-                                <div class="actions">
-
-                                    ${
-                        canManageWarehouse() &&
-                        t.status === 'PENDING'
-
-                        ? `
-
-                                        <button
-                                            class="btn ok small"
-                                            onclick="txApprove(${t.id})"
+                                        <span
+                                            class="badge ${t.type}"
                                         >
-                                            Duyệt
-                                        </button>
+
+                                            ${
+                                                t.type === 'IN'
+                                                ? 'Nhập'
+                                                : 'Xuất'
+                                            }
+
+                                        </span>
+
+                                    </td>
 
 
-                                        <button
-                                            class="btn danger small"
-                                            onclick="txReject(${t.id})"
+                                    <td>
+
+                                        ${esc(
+                                            t.product?.name ||
+                                            'Sản phẩm đã xóa'
+                                        )}
+
+                                    </td>
+
+
+                                    <td class="num">
+                                        ${t.quantity}
+                                    </td>
+
+
+                                    <td>
+
+                                        ${esc(
+                                            t.createdBy
+                                            ? (
+                                                t.createdBy.fullName ||
+                                                t.createdBy.username
+                                            )
+                                            : ''
+                                        )}
+
+                                    </td>
+
+
+                                    <td>
+                                        ${esc(t.note || '')}
+                                    </td>
+
+
+                                    <td>
+
+                                        <span
+                                            class="badge ${t.status}"
                                         >
-                                            Từ chối
-                                        </button>
 
-                                        `
+                                            ${
+                                                STATUS[t.status] ||
+                                                t.status
+                                            }
 
-                        : ''
+                                        </span>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <div class="actions">
+
+                                            ${
+                                                canManageWarehouse() &&
+                                                t.status === 'PENDING'
+
+                                                ? `
+
+                                                    <button
+                                                        class="
+                                                            btn
+                                                            ok
+                                                            small
+                                                        "
+                                                        onclick="
+                                                            txApprove(${t.id})
+                                                        "
+                                                    >
+                                                        Duyệt
+                                                    </button>
+
+
+                                                    <button
+                                                        class="
+                                                            btn
+                                                            danger
+                                                            small
+                                                        "
+                                                        onclick="
+                                                            txReject(${t.id})
+                                                        "
+                                                    >
+                                                        Từ chối
+                                                    </button>
+
+                                                `
+
+                                                : ''
+                                            }
+
+
+                                            ${
+                                                txCanCancel(t)
+
+                                                ? `
+
+                                                    <button
+                                                        class="
+                                                            btn
+                                                            ghost
+                                                            small
+                                                        "
+                                                        onclick="
+                                                            txCancel(${t.id})
+                                                        "
+                                                    >
+                                                        Hủy phiếu
+                                                    </button>
+
+                                                `
+
+                                                : ''
+                                            }
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            `).join('')}
+
+                        </tbody>
+
+                    </table>
+
+                `
+
+                : `
+
+                    <div class="empty">
+
+                        ${
+                            tx.fromDate ||
+                            tx.toDate
+
+                            ? 'Không có phiếu nào trong khoảng thời gian đã chọn.'
+
+                            : 'Chưa có phiếu nào.'
                         }
 
+                    </div>
 
-                                    ${
-                        txCanCancel(t)
-
-                        ? `
-
-                                        <button
-                                            class="btn ghost small"
-                                            onclick="txCancel(${t.id})"
-                                        >
-                                            Hủy phiếu
-                                        </button>
-
-                                        `
-
-                        : ''
-                        }
-
-                                </div>
-
-                            </td>
-
-                        </tr>
-
-                    `).join('')}
-
-                </tbody>
-
-            </table>
-
-            `
-
-            : `
-
-            <div class="empty">
-
-                ${
-            tx.fromDate || tx.toDate
-            ? 'Không có phiếu nào trong khoảng thời gian đã chọn.'
-            : 'Chưa có phiếu nào.'
+                `
             }
 
-            </div>
-
-            `
-            }
-
-    </div>
+        </div>
 
     `);
 }
-/* ================= Danh mục / Người dùng (dùng chung) ================= */
+
+
+/* ================= Danh mục / Người dùng ================= */
+
 const CRUD = {
+
     categories: {
+
         title: 'Danh mục',
+
         endpoint: '/categories',
+
         fields: [
-            {key: 'name', label: 'Tên danh mục'},
-            {key: 'description', label: 'Mô tả'}
+
+            {
+                key: 'name',
+                label: 'Tên danh mục'
+            },
+
+            {
+                key: 'description',
+                label: 'Mô tả'
+            }
+
         ]
     },
+
+
     users: {
+
         title: 'Người dùng',
+
         endpoint: '/users',
+
         fields: [
-            {key: 'username', label: 'Tên đăng nhập', lockOnEdit: true},
+
+            {
+                key: 'username',
+                label: 'Tên đăng nhập',
+                lockOnEdit: true
+            },
+
+
             {
                 key: 'password',
                 label: 'Mật khẩu',
                 type: 'password',
                 hideInTable: true,
-                hint: 'Để trống khi sửa nếu không đổi'
+                hint:
+                    'Để trống khi sửa nếu không đổi'
             },
-            {key: 'fullName', label: 'Họ tên'},
-            {key: 'email', label: 'Email'},
+
+
+            {
+                key: 'fullName',
+                label: 'Họ tên'
+            },
+
+
+            {
+                key: 'email',
+                label: 'Email'
+            },
+
+
             {
                 key: 'role',
                 label: 'Vai trò',
                 type: 'select',
-                options: ['USER', 'ADMIN', 'MANAGER']
+                options: [
+                    'USER',
+                    'ADMIN',
+                    'MANAGER'
+                ]
             },
+
+
             {
                 key: 'active',
                 label: 'Đang hoạt động',
                 type: 'checkbox'
             }
+
         ]
     }
 };
+
+
 let crud = null;
+
+
 async function pageCrud(key) {
+
     crud = {
+
         key,
-        cfg: CRUD[key],
+
+        cfg:
+            CRUD[key],
+
         items: [],
+
         editing: null,
+
         values: null,
+
         error: '',
+
         search: ''
     };
+
+
     crudLoad();
 }
 
+
 async function crudLoad() {
+
     try {
-        crud.items = await api(crud.cfg.endpoint);
+
+        crud.items =
+            await api(
+                crud.cfg.endpoint
+            );
+
     } catch (e) {
-        crud.error = e.message;
+
+        crud.error =
+            e.message;
     }
+
+
     crudDraw();
 }
 
-function crudSearch() {
-    const input = document.getElementById('crud_search');
 
-    crud.search = input ? input.value.trim() : '';
+function crudSearch() {
+
+    const input =
+        document.getElementById(
+            'crud_search'
+        );
+
+
+    crud.search =
+        input
+        ? input.value.trim()
+        : '';
+
 
     crudDraw();
 }
 
 
 function crudBlank() {
+
     const v = {};
+
+
     crud.cfg.fields.forEach((f) => {
-        v[f.key] = f.type === 'checkbox' ? true : f.options ? f.options[0] : '';
+
+        v[f.key] =
+            f.type === 'checkbox'
+            ? true
+            : f.options
+                ? f.options[0]
+                : '';
+
     });
+
+
     return v;
 }
 
+
 function crudAdd() {
+
     crud.editing = null;
+
     crud.error = '';
-    crud.values = crudBlank();
+
+    crud.values =
+        crudBlank();
+
     crudDraw();
 }
+
 
 function crudEdit(id) {
-    const it = crud.items.find((x) => x.id === id);
-    crud.editing = id;
+
+    const it =
+        crud.items.find(
+            (x) => x.id === id
+        );
+
+
+    crud.editing =
+        id;
+
     crud.error = '';
-    crud.values = {...crudBlank(), ...it};
-    crud.cfg.fields.filter((f) => f.type === 'password').forEach((f) => {
-        crud.values[f.key] = '';
-    });
+
+    crud.values = {
+        ...crudBlank(),
+        ...it
+    };
+
+
+    crud.cfg.fields
+        .filter(
+            (f) => f.type === 'password'
+        )
+        .forEach((f) => {
+
+            crud.values[f.key] = '';
+
+        });
+
+
     crudDraw();
 }
 
+
 function crudCancel() {
+
     crud.values = null;
+
     crud.error = '';
+
     crudDraw();
 }
 
 
 async function crudSave() {
+
     const v = {};
 
-    // Lấy dữ liệu từ form
+
+    /*
+     * Lấy dữ liệu từ form
+     */
+
     crud.cfg.fields.forEach((f) => {
-        if (f.key === 'active')
+
+        if (f.key === 'active') {
             return;
+        }
 
-        const el = document.getElementById('f_' + f.key);
 
-        if (!el)
+        const el =
+            document.getElementById(
+                'f_' + f.key
+            );
+
+
+        if (!el) {
             return;
+        }
 
-        v[f.key] = f.type === 'checkbox'
-                ? el.checked
-                : el.value.trim();
+
+        v[f.key] =
+            f.type === 'checkbox'
+            ? el.checked
+            : el.value.trim();
+
     });
 
-// ================= DANH MỤC =================
+
+    /* ================= DANH MỤC ================= */
+
     if (crud.key === 'categories') {
 
         if (!v.name) {
-            crud.error = 'Tên danh mục không được để trống';
+
+            crud.error =
+                'Tên danh mục không được để trống';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
+
 
         if (!v.description) {
-            crud.error = 'Mô tả không được để trống';
+
+            crud.error =
+                'Mô tả không được để trống';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
 
-        if (!/^[a-zA-ZÀ-ỹ0-9\s]+$/.test(v.name)) {
-            crud.error = 'Tên danh mục không được có ký tự đặc biệt';
+
+        if (
+            !/^[a-zA-ZÀ-ỹ0-9\s]+$/.test(
+                v.name
+            )
+        ) {
+
+            crud.error =
+                'Tên danh mục không được có ký tự đặc biệt';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
     }
 
-    // ================= NGƯỜI DÙNG =================
+
+    /* ================= NGƯỜI DÙNG ================= */
+
     if (crud.key === 'users') {
 
         if (!v.username) {
-            crud.error = 'Tên đăng nhập không được để trống';
+
+            crud.error =
+                'Tên đăng nhập không được để trống';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
 
-        if (!/^[a-zA-Z0-9_]+$/.test(v.username)) {
-            crud.error = 'Tên đăng nhập chỉ được dùng chữ, số và dấu _';
+
+        if (
+            !/^[a-zA-Z0-9_]+$/.test(
+                v.username
+            )
+        ) {
+
+            crud.error =
+                'Tên đăng nhập chỉ được dùng chữ, số và dấu _';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
 
-        if (!crud.editing && !v.password) {
-            crud.error = 'Mật khẩu không được để trống';
+
+        if (
+            !crud.editing &&
+            !v.password
+        ) {
+
+            crud.error =
+                'Mật khẩu không được để trống';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
 
-        if (v.password && v.password.length < 6) {
-            crud.error = 'Mật khẩu phải từ 6 ký tự';
+
+        if (
+            v.password &&
+            v.password.length < 6
+        ) {
+
+            crud.error =
+                'Mật khẩu phải từ 6 ký tự';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
+
 
         if (!v.fullName) {
-            crud.error = 'Họ tên không được để trống';
+
+            crud.error =
+                'Họ tên không được để trống';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
+
 
         if (!v.email) {
-            crud.error = 'Email không được để trống';
+
+            crud.error =
+                'Email không được để trống';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
 
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) {
-            crud.error = 'Email không hợp lệ';
+
+        if (
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+                v.email
+            )
+        ) {
+
+            crud.error =
+                'Email không hợp lệ';
+
             crud.values = v;
+
             crudDraw();
+
             return;
         }
 
-        // Khi sửa user mà không nhập mật khẩu
-        // thì giữ nguyên mật khẩu cũ
-        if (crud.editing && !v.password) {
+
+        /*
+         * Khi sửa user mà không nhập mật khẩu
+         * thì giữ nguyên mật khẩu cũ.
+         */
+
+        if (
+            crud.editing &&
+            !v.password
+        ) {
+
             delete v.password;
         }
     }
 
-    // ================= LƯU =================
+
+    /* ================= LƯU ================= */
+
     try {
-        const url = crud.cfg.endpoint +
-                (crud.editing ? '/' + crud.editing : '');
+
+        const url =
+            crud.cfg.endpoint +
+            (
+                crud.editing
+                ? '/' + crud.editing
+                : ''
+            );
+
 
         await api(
-                url,
-                crud.editing ? 'PUT' : 'POST',
-                v
-                );
+
+            url,
+
+            crud.editing
+            ? 'PUT'
+            : 'POST',
+
+            v
+
+        );
+
 
         crud.values = null;
+
         crud.editing = null;
+
         crud.error = '';
 
         await crudLoad();
 
     } catch (e) {
-        crud.error = e.message;
+
+        crud.error =
+            e.message;
+
         crud.values = v;
+
         crudDraw();
     }
 }
-
 
 
 async function crudDelete(id) {
+
     const typeName = {
-        categories: 'danh mục'
+
+        categories:
+            'danh mục'
+
     };
-    const type = crud.cfg.endpoint.replace('/api/', '');
-    const name = typeName[type] || 'mục này';
-    if (!confirm(`Bạn có chắc muốn xóa ${name} này?`)) {
+
+
+    const type =
+        crud.cfg.endpoint
+            .replace('/api/', '');
+
+
+    const name =
+        typeName[type] ||
+        'mục này';
+
+
+    if (
+        !confirm(
+            `Bạn có chắc muốn xóa ${name} này?`
+        )
+    ) {
+
         return;
     }
 
+
     try {
+
         await api(
-                crud.cfg.endpoint + '/' + id,
-                'DELETE'
-                );
+            crud.cfg.endpoint +
+            '/' +
+            id,
+            'DELETE'
+        );
+
+
         crud.error = '';
+
         await crudLoad();
-        alert(`✅ Đã xóa ${name} thành công!`);
+
+
+        alert(
+            `✅ Đã xóa ${name} thành công!`
+        );
+
     } catch (e) {
-        console.error('LỖI XÓA:', e);
-        alert('❌ Lỗi xóa: ' + e.message);
-        crud.error = e.message;
+
+        console.error(
+            'LỖI XÓA:',
+            e
+        );
+
+
+        alert(
+            '❌ Lỗi xóa: ' +
+            e.message
+        );
+
+
+        crud.error =
+            e.message;
+
         crudDraw();
     }
 }
 
-function crudFormHtml() {
-    const v = crud.values;
 
-    const inputs = crud.cfg.fields
-            .filter((f) => f.key !== 'active')
+function crudFormHtml() {
+
+    const v =
+        crud.values;
+
+
+    const inputs =
+        crud.cfg.fields
+
+            .filter(
+                (f) => f.key !== 'active'
+            )
+
             .map((f) => {
-                const id = 'f_' + f.key;
+
+                const id =
+                    'f_' + f.key;
+
 
                 if (f.type === 'select') {
+
                     return `
+
                     <label>
+
                         ${esc(f.label)}
+
                         <select id="${id}">
-                            ${f.options.map((o) => `
+
+                            ${f.options.map(o => `
+
                                 <option
                                     value="${o}"
-                                    ${v[f.key] === o ? 'selected' : ''}
+                                    ${
+                                        v[f.key] === o
+                                        ? 'selected'
+                                        : ''
+                                    }
                                 >
                                     ${o}
                                 </option>
+
                             `).join('')}
+
                         </select>
+
                     </label>
-                `;
+
+                    `;
                 }
 
-                let placeholder = f.hint || '';
 
-                if (crud.key === 'categories') {
+                let placeholder =
+                    f.hint || '';
+
+
+                if (
+                    crud.key === 'categories'
+                ) {
+
                     if (f.key === 'name') {
-                        placeholder = 'VD: Thùng Công Cụ';
+
+                        placeholder =
+                            'VD: Thùng Công Cụ';
                     }
 
-                    if (f.key === 'description') {
-                        placeholder = 'VD: Wedo, Spike, Prime, Essential';
+
+                    if (
+                        f.key === 'description'
+                    ) {
+
+                        placeholder =
+                            'VD: Wedo, Spike, Prime, Essential';
                     }
                 }
 
-                if (crud.key === 'users') {
-                    if (f.key === 'username') {
-                        placeholder = 'VD: admin123';
+
+                if (
+                    crud.key === 'users'
+                ) {
+
+                    if (
+                        f.key === 'username'
+                    ) {
+
+                        placeholder =
+                            'VD: admin123';
                     }
 
-                    if (f.key === 'password') {
-                        placeholder = 'VD: Abc@123456';
+
+                    if (
+                        f.key === 'password'
+                    ) {
+
+                        placeholder =
+                            'VD: Abc@123456';
                     }
 
-                    if (f.key === 'fullName') {
-                        placeholder = 'VD: Nguyễn Hoàng Đạt';
+
+                    if (
+                        f.key === 'fullName'
+                    ) {
+
+                        placeholder =
+                            'VD: Nguyễn Hoàng Đạt';
                     }
 
-                    if (f.key === 'email') {
-                        placeholder = 'VD: example@gmail.com';
+
+                    if (
+                        f.key === 'email'
+                    ) {
+
+                        placeholder =
+                            'VD: example@gmail.com';
                     }
                 }
+
 
                 const disabled =
-                        f.lockOnEdit && crud.editing
-                        ? 'disabled'
-                        : '';
+
+                    f.lockOnEdit &&
+                    crud.editing
+
+                    ? 'disabled'
+                    : '';
+
 
                 return `
+
                 <label>
+
                     ${esc(f.label)}
 
                     <input
                         id="${id}"
                         type="${f.type || 'text'}"
-                        value="${esc(v[f.key] ?? '')}"
-                        placeholder="${esc(placeholder)}"
+                        value="${esc(
+                            v[f.key] ?? ''
+                        )}"
+                        placeholder="${esc(
+                            placeholder
+                        )}"
                         ${disabled}
                     >
+
                 </label>
-            `;
+
+                `;
+
             })
             .join('');
 
+
     return `
+
         <div class="panel">
+
             <div class="form">
+
                 ${inputs}
+
             </div>
+
 
             <div
                 class="actions"
                 style="margin-top:12px"
             >
+
                 <button
                     class="btn"
                     onclick="crudSave()"
@@ -1717,38 +3746,67 @@ function crudFormHtml() {
                     Lưu
                 </button>
 
+
                 <button
                     class="btn ghost"
                     onclick="crudCancel()"
                 >
                     Hủy
                 </button>
+
             </div>
+
         </div>
+
     `;
 }
 
+
 function crudDraw() {
 
-    const shown = crud.cfg.fields.filter(f => !f.hideInTable);
+    const shown =
+        crud.cfg.fields.filter(
+            f => !f.hideInTable
+        );
 
-    const keyword = (crud.search || '').toLowerCase().trim();
 
-    const filteredItems = crud.items.filter(item => {
+    const keyword =
+        (crud.search || '')
+            .toLowerCase()
+            .trim();
 
-        const text = shown
-                .map(f => item[f.key] ?? '')
-                .join(' ')
-                .toLowerCase();
 
-        return text.includes(keyword);
-    });
+    const filteredItems =
+        crud.items.filter(item => {
+
+            const text =
+                shown
+
+                    .map(
+                        f => item[f.key] ?? ''
+                    )
+
+                    .join(' ')
+
+                    .toLowerCase();
+
+
+            return text.includes(
+                keyword
+            );
+
+        });
+
 
     draw(`
 
-        <h1>${crud.cfg.title}</h1>
+        <h1>
+            ${crud.cfg.title}
+        </h1>
+
 
         ${err(crud.error)}
+
 
         <div class="toolbar">
 
@@ -1756,13 +3814,14 @@ function crudDraw() {
                 type="text"
                 id="crud_search"
                 placeholder="${
-            crud.key === 'categories'
-            ? '🔍 Nhập tên danh mục...'
-            : '🔍 Nhập tên người dùng...'
-            }"
+                    crud.key === 'categories'
+                    ? '🔍 Nhập tên danh mục...'
+                    : '🔍 Nhập tên người dùng...'
+                }"
                 value=""
                 style="min-width:280px;"
             >
+
 
             <button
                 class="btn"
@@ -1770,6 +3829,7 @@ function crudDraw() {
             >
                 🔍 Tìm kiếm
             </button>
+
 
             <button
                 class="btn"
@@ -1780,281 +3840,468 @@ function crudDraw() {
 
         </div>
 
-        ${crud.values ? crudFormHtml() : ''}
+
+        ${
+            crud.values
+            ? crudFormHtml()
+            : ''
+        }
+
 
         <div class="panel table-wrap">
 
             ${
-            filteredItems.length
+                filteredItems.length
 
-            ? `
+                ? `
 
-                <table>
+                    <table>
 
-                    <thead>
-
-                        <tr>
-
-                            <th>ID</th>
-
-                            ${shown.map(f => `
-                                <th>${esc(f.label)}</th>
-                            `).join('')}
-
-                            <th>Thao tác</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        ${
-            filteredItems.map(it => `
+                        <thead>
 
                             <tr>
 
-                                <td>
-                                    ${it.id}
-                                </td>
+                                <th>ID</th>
 
                                 ${shown.map(f => `
 
-                                    <td>
-
-                                        ${
-                            f.type === 'checkbox'
-                            ? (it[f.key] ? 'Có' : 'Không')
-                            : esc(it[f.key] ?? '')
-                            }
-
-                                    </td>
+                                    <th>
+                                        ${esc(f.label)}
+                                    </th>
 
                                 `).join('')}
 
-                                <td>
-
-                                    <button
-                                        class="btn ghost small"
-                                        onclick="crudEdit(${it.id})"
-                                    >
-                                        Sửa
-                                    </button>
-
-                                    <button
-                                        class="btn danger small"
-                                        onclick="crudDelete(${it.id})"
-                                    >
-                                        Xóa
-                                    </button>
-
-                                </td>
+                                <th>
+                                    Thao tác
+                                </th>
 
                             </tr>
 
-                        `).join('')}
+                        </thead>
 
-                    </tbody>
 
-                </table>
+                        <tbody>
 
-            `
+                            ${filteredItems.map(it => `
 
-            : `
+                                <tr>
 
-                <div class="empty">
+                                    <td>
+                                        ${it.id}
+                                    </td>
 
-                    ${
-            keyword
-            ? 'Không tìm thấy dữ liệu phù hợp.'
-            : 'Chưa có dữ liệu.'
-            }
 
-                </div>
+                                    ${shown.map(f => `
 
-            `
+                                        <td>
+
+                                            ${
+                                                f.type === 'checkbox'
+
+                                                ? (
+                                                    it[f.key]
+                                                    ? 'Có'
+                                                    : 'Không'
+                                                )
+
+                                                : esc(
+                                                    it[f.key] ?? ''
+                                                )
+                                            }
+
+                                        </td>
+
+                                    `).join('')}
+
+
+                                    <td>
+
+                                        <button
+                                            class="
+                                                btn
+                                                ghost
+                                                small
+                                            "
+                                            onclick="
+                                                crudEdit(${it.id})
+                                            "
+                                        >
+                                            Sửa
+                                        </button>
+
+
+                                        <button
+                                            class="
+                                                btn
+                                                danger
+                                                small
+                                            "
+                                            onclick="
+                                                crudDelete(${it.id})
+                                            "
+                                        >
+                                            Xóa
+                                        </button>
+
+                                    </td>
+
+                                </tr>
+
+                            `).join('')}
+
+                        </tbody>
+
+                    </table>
+
+                `
+
+                : `
+
+                    <div class="empty">
+
+                        ${
+                            keyword
+                            ? 'Không tìm thấy dữ liệu phù hợp.'
+                            : 'Chưa có dữ liệu.'
+                        }
+
+                    </div>
+
+                `
             }
 
         </div>
 
     `);
 
-    const search = document.getElementById('crud_search');
+
+    const search =
+        document.getElementById(
+            'crud_search'
+        );
+
 
     if (search) {
-        search.addEventListener('keyup', e => {
-            if (e.key === 'Enter') {
-                crudSearch();
+
+        search.addEventListener(
+            'keyup',
+            e => {
+
+                if (e.key === 'Enter') {
+                    crudSearch();
+                }
+
             }
-        });
+        );
     }
 }
-
 
 
 /* ================= Bài giảng ================= */
 
 let lectures = {
+
     items: [],
+
     form: null,
+
     editing: null,
+
     error: ''
 };
+
+
 async function pageLectures() {
+
     lectures = {
+
         items: [],
+
         form: null,
+
         editing: null,
+
         error: ''
     };
+
+
     await lectureLoad();
 }
 
+
 async function lectureLoad() {
+
     try {
-        lectures.items = await api('/lectures');
+
+        lectures.items =
+            await api('/lectures');
+
         lectures.error = '';
+
     } catch (e) {
-        lectures.error = e.message;
+
+        lectures.error =
+            e.message;
     }
 
+
     lectureDraw();
 }
+
 
 function lectureAdd() {
+
     lectures.editing = null;
+
     lectures.error = '';
+
     lectures.form = {
+
         name: '',
+
         link: ''
     };
+
+
     lectureDraw();
 }
+
 
 function lectureEdit(id) {
-    const item = lectures.items.find(x => x.id === id);
-    if (!item)
+
+    const item =
+        lectures.items.find(
+            x => x.id === id
+        );
+
+
+    if (!item) {
         return;
-    lectures.editing = id;
+    }
+
+
+    lectures.editing =
+        id;
+
     lectures.error = '';
+
     lectures.form = {
-        name: item.name || '',
-        link: item.link || ''
+
+        name:
+            item.name || '',
+
+        link:
+            item.link || ''
     };
+
+
     lectureDraw();
 }
 
+
 function lectureCancel() {
+
     lectures.form = null;
+
     lectures.editing = null;
+
     lectures.error = '';
+
     lectureDraw();
 }
+
 
 async function lectureSave() {
 
-    const name = val('lecture_name').trim();
-    const link = val('lecture_link').trim();
+    const name =
+        val('lecture_name').trim();
+
+    const link =
+        val('lecture_link').trim();
+
+
     if (!name) {
-        lectures.error = 'Tên bài giảng không được để trống';
+
+        lectures.error =
+            'Tên bài giảng không được để trống';
+
         lectureDraw();
+
         return;
     }
+
 
     if (!link) {
-        lectures.error = 'Link bài giảng không được để trống';
+
+        lectures.error =
+            'Link bài giảng không được để trống';
+
         lectureDraw();
+
         return;
     }
 
-    if (!/^https?:\/\/.+/i.test(link)) {
-        lectures.error = 'Link phải bắt đầu bằng http:// hoặc https://';
+
+    if (
+        !/^https?:\/\/.+/i.test(link)
+    ) {
+
+        lectures.error =
+            'Link phải bắt đầu bằng http:// hoặc https://';
+
         lectureDraw();
+
         return;
     }
+
 
     const body = {
+
         name: name,
+
         link: link
     };
+
+
     try {
 
         if (lectures.editing) {
 
             await api(
-                    '/lectures/' + lectures.editing,
-                    'PUT',
-                    body
-                    );
-            alert('Đã sửa bài giảng!');
+
+                '/lectures/' +
+                lectures.editing,
+
+                'PUT',
+
+                body
+            );
+
+
+            alert(
+                'Đã sửa bài giảng!'
+            );
+
         } else {
 
             await api(
-                    '/lectures',
-                    'POST',
-                    body
-                    );
-            alert('Đã thêm bài giảng!');
+
+                '/lectures',
+
+                'POST',
+
+                body
+            );
+
+
+            alert(
+                'Đã thêm bài giảng!'
+            );
         }
 
+
         lectures.form = null;
+
         lectures.editing = null;
+
         lectures.error = '';
+
         await lectureLoad();
+
     } catch (e) {
 
-        lectures.error = e.message;
+        lectures.error =
+            e.message;
+
         lectureDraw();
     }
 }
 
+
 async function lectureDelete(id) {
 
-    if (!confirm('Bạn có chắc muốn xóa bài giảng này?')) {
+    if (
+        !confirm(
+            'Bạn có chắc muốn xóa bài giảng này?'
+        )
+    ) {
+
         return;
     }
+
 
     try {
 
         await api(
-                '/lectures/' + id,
-                'DELETE'
-                );
-        alert('Đã xóa bài giảng!');
+
+            '/lectures/' +
+            id,
+
+            'DELETE'
+        );
+
+
+        alert(
+            'Đã xóa bài giảng!'
+        );
+
+
         await lectureLoad();
+
     } catch (e) {
 
-        lectures.error = e.message;
+        lectures.error =
+            e.message;
+
         lectureDraw();
     }
 }
 
+
 function lectureOpen(link) {
 
-    if (!link)
+    if (!link) {
         return;
+    }
+
+
     window.open(
-            link,
-            '_blank',
-            'noopener,noreferrer'
-            );
+
+        link,
+
+        '_blank',
+
+        'noopener,noreferrer'
+    );
 }
+
 
 function lectureFormHtml() {
 
-    const f = lectures.form;
+    const f =
+        lectures.form;
+
+
     return `
+
         <div class="panel">
 
             <h2>
-                ${lectures.editing
-            ? 'Sửa bài giảng'
-            : 'Thêm bài giảng'}
+
+                ${
+                    lectures.editing
+                    ? 'Sửa bài giảng'
+                    : 'Thêm bài giảng'
+                }
+
             </h2>
+
 
             <div class="form">
 
+
                 <label>
+
                     Tên bài giảng
 
                     <input
@@ -2062,9 +4309,12 @@ function lectureFormHtml() {
                         value="${esc(f.name)}"
                         placeholder="Ví dụ: Hướng Dẫn Lắp Xe Máy"
                     >
+
                 </label>
 
+
                 <label>
+
                     Link bài giảng
 
                     <input
@@ -2073,9 +4323,12 @@ function lectureFormHtml() {
                         value="${esc(f.link)}"
                         placeholder="https://..."
                     >
+
                 </label>
 
+
             </div>
+
 
             <div
                 class="actions"
@@ -2089,6 +4342,7 @@ function lectureFormHtml() {
                     Lưu bài giảng
                 </button>
 
+
                 <button
                     class="btn ghost"
                     onclick="lectureCancel()"
@@ -2099,27 +4353,51 @@ function lectureFormHtml() {
             </div>
 
         </div>
+
     `;
 }
+
 
 function lectureDraw() {
 
     const canManage = true;
 
-    const keyword = (lectures.search || '').toLowerCase().trim();
 
-    const filteredItems = lectures.items.filter(item => {
-        const name = (item.name || '').toLowerCase();
-        const link = (item.link || '').toLowerCase();
+    const keyword =
+        (lectures.search || '')
+            .toLowerCase()
+            .trim();
 
-        return name.includes(keyword) || link.includes(keyword);
-    });
+
+    const filteredItems =
+        lectures.items.filter(item => {
+
+            const name =
+                (item.name || '')
+                    .toLowerCase();
+
+            const link =
+                (item.link || '')
+                    .toLowerCase();
+
+
+            return (
+                name.includes(keyword) ||
+                link.includes(keyword)
+            );
+
+        });
+
 
     draw(`
 
-        <h1>📚 Bài giảng</h1>
+        <h1>
+            📚 Bài giảng
+        </h1>
+
 
         ${err(lectures.error)}
+
 
         <div class="toolbar">
 
@@ -2131,12 +4409,14 @@ function lectureDraw() {
                 style="min-width:280px;"
             >
 
+
             <button
                 class="btn"
                 onclick="lectureSearch()"
             >
                 🔍 Tìm kiếm
             </button>
+
 
             <button
                 class="btn"
@@ -2147,106 +4427,150 @@ function lectureDraw() {
 
         </div>
 
+
         ${
             lectures.form
             ? lectureFormHtml()
             : ''
-            }
+        }
+
 
         <div class="panel table-wrap">
 
             ${
-            filteredItems.length
+                filteredItems.length
 
-            ? `
+                ? `
 
-                <table>
+                    <table>
 
-                    <thead>
-
-                        <tr>
-                            <th>ID</th>
-                            <th>Tên bài giảng</th>
-                            <th>Link</th>
-                            <th>Thao tác</th>
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        ${
-            filteredItems
-            .map(item => `
+                        <thead>
 
                             <tr>
 
-                                <td>
-                                    ${item.id}
-                                </td>
+                                <th>ID</th>
 
-                                <td>
-                                    <b>
-                                        ${esc(item.name)}
-                                    </b>
-                                </td>
+                                <th>
+                                    Tên bài giảng
+                                </th>
 
-                                <td>
+                                <th>
+                                    Link
+                                </th>
 
-                                    <button
-                                        class="btn small"
-                                        onclick="lectureOpen('${esc(item.link)}')"
-                                    >
-                                        🔗 Mở bài giảng
-                                    </button>
-
-                                </td>
-
-                                <td>
-
-                                    <div class="actions">
-
-                                        <button
-                                            class="btn ghost small"
-                                            onclick="lectureEdit(${item.id})"
-                                        >
-                                            Sửa
-                                        </button>
-
-                                        <button
-                                            class="btn danger small"
-                                            onclick="lectureDelete(${item.id})"
-                                        >
-                                            Xóa
-                                        </button>
-
-                                    </div>
-
-                                </td>
+                                <th>
+                                    Thao tác
+                                </th>
 
                             </tr>
 
-                        `)
-            .join('')
-            }
+                        </thead>
 
-                    </tbody>
 
-                </table>
+                        <tbody>
 
-            `
+                            ${
+                                filteredItems
 
-            : `
+                                .map(item => `
 
-                <div class="empty">
-                    ${
-            keyword
-            ? 'Không tìm thấy bài giảng phù hợp.'
-            : 'Chưa có bài giảng nào.'
-            }
-                </div>
+                                    <tr>
 
-            `
+                                        <td>
+                                            ${item.id}
+                                        </td>
+
+
+                                        <td>
+
+                                            <b>
+                                                ${esc(item.name)}
+                                            </b>
+
+                                        </td>
+
+
+                                        <td>
+
+                                            <button
+                                                class="btn small"
+                                                onclick="
+                                                    lectureOpen(
+                                                        '${esc(item.link)}'
+                                                    )
+                                                "
+                                            >
+                                                🔗 Mở bài giảng
+                                            </button>
+
+                                        </td>
+
+
+                                        <td>
+
+                                            <div class="actions">
+
+                                                <button
+                                                    class="
+                                                        btn
+                                                        ghost
+                                                        small
+                                                    "
+                                                    onclick="
+                                                        lectureEdit(
+                                                            ${item.id}
+                                                        )
+                                                    "
+                                                >
+                                                    Sửa
+                                                </button>
+
+
+                                                <button
+                                                    class="
+                                                        btn
+                                                        danger
+                                                        small
+                                                    "
+                                                    onclick="
+                                                        lectureDelete(
+                                                            ${item.id}
+                                                        )
+                                                    "
+                                                >
+                                                    Xóa
+                                                </button>
+
+                                            </div>
+
+                                        </td>
+
+                                    </tr>
+
+                                `)
+
+                                .join('')
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                `
+
+                : `
+
+                    <div class="empty">
+
+                        ${
+                            keyword
+                            ? 'Không tìm thấy bài giảng phù hợp.'
+                            : 'Chưa có bài giảng nào.'
+                        }
+
+                    </div>
+
+                `
             }
 
         </div>
@@ -2254,38 +4578,76 @@ function lectureDraw() {
     `);
 }
 
-function lectureSearch() {
-    const input = document.getElementById('lecture_search');
 
-    lectures.search = input ? input.value.trim() : '';
+function lectureSearch() {
+
+    const input =
+        document.getElementById(
+            'lecture_search'
+        );
+
+
+    lectures.search =
+        input
+        ? input.value.trim()
+        : '';
+
 
     lectureDraw();
 }
 
 
 /* ================= Tài khoản ================= */
-function pageProfile(msg = '', isError = false) {
+
+function pageProfile(
+    msg = '',
+    isError = false
+) {
 
     draw(`
-        <h1>👤 Tài khoản</h1>
+
+        <h1>
+            👤 Tài khoản
+        </h1>
+
 
         <div class="panel">
 
-            <h2>Thông tin tài khoản</h2>
+            <h2>
+                Thông tin tài khoản
+            </h2>
+
 
             <p>
+
                 <b>Họ tên:</b>
-                ${esc(user.fullName || '')}
+
+                ${esc(
+                    user.fullName || ''
+                )}
+
             </p>
 
+
             <p>
+
                 <b>Tên đăng nhập:</b>
-                ${esc(user.username || '')}
+
+                ${esc(
+                    user.username || ''
+                )}
+
             </p>
 
+
             <p>
+
                 <b>Vai trò:</b>
-                ${esc(user.role || '')}
+
+                ${esc(
+                    user.role || ''
+                )}
+
             </p>
 
         </div>
@@ -2293,13 +4655,23 @@ function pageProfile(msg = '', isError = false) {
 
         <div class="panel">
 
-            <h2>🔐 Đổi mật khẩu</h2>
+            <h2>
+                🔐 Đổi mật khẩu
+            </h2>
 
-            ${isError ? err(msg) : okMsg(msg)}
+
+            ${
+                isError
+                ? err(msg)
+                : okMsg(msg)
+            }
+
 
             <div class="form">
 
+
                 <label>
+
                     Mật khẩu hiện tại
 
                     <input
@@ -2308,10 +4680,12 @@ function pageProfile(msg = '', isError = false) {
                         placeholder="Nhập mật khẩu hiện tại"
                         autocomplete="current-password"
                     >
+
                 </label>
 
 
                 <label>
+
                     Mật khẩu mới
 
                     <input
@@ -2320,10 +4694,12 @@ function pageProfile(msg = '', isError = false) {
                         placeholder="Mật khẩu mới (từ 6 ký tự)"
                         autocomplete="new-password"
                     >
+
                 </label>
 
 
                 <label>
+
                     Xác nhận mật khẩu mới
 
                     <input
@@ -2332,6 +4708,7 @@ function pageProfile(msg = '', isError = false) {
                         placeholder="Nhập lại mật khẩu mới"
                         autocomplete="new-password"
                     >
+
                 </label>
 
 
@@ -2352,84 +4729,115 @@ function pageProfile(msg = '', isError = false) {
             </div>
 
         </div>
+
     `);
 }
 
 
+/* ================= Đổi mật khẩu ================= */
+
 async function changePassword() {
 
-    const oldPassword = val('pw_old');
-    const newPassword = val('pw_new');
-    const confirmPassword = val('pw_confirm');
+    const oldPassword =
+        val('pw_old');
+
+    const newPassword =
+        val('pw_new');
+
+    const confirmPassword =
+        val('pw_confirm');
 
 
-    // ================= KIỂM TRA =================
+    /* ================= KIỂM TRA ================= */
 
     if (!oldPassword) {
+
         pageProfile(
             'Mật khẩu hiện tại không được để trống',
             true
         );
+
         return;
     }
 
 
     if (!newPassword) {
+
         pageProfile(
             'Mật khẩu mới không được để trống',
             true
         );
+
         return;
     }
 
 
     if (newPassword.length < 6) {
+
         pageProfile(
             'Mật khẩu mới phải từ 6 ký tự',
             true
         );
+
         return;
     }
 
 
     if (!confirmPassword) {
+
         pageProfile(
             'Vui lòng xác nhận mật khẩu mới',
             true
         );
+
         return;
     }
 
 
-    if (newPassword !== confirmPassword) {
+    if (
+        newPassword !== confirmPassword
+    ) {
+
         pageProfile(
             'Mật khẩu xác nhận không khớp',
             true
         );
+
         return;
     }
 
 
-    if (oldPassword === newPassword) {
+    if (
+        oldPassword === newPassword
+    ) {
+
         pageProfile(
             'Mật khẩu mới phải khác mật khẩu hiện tại',
             true
         );
+
         return;
     }
 
 
-    // ================= GỌI API =================
+    /* ================= GỌI API ================= */
 
     try {
 
         await api(
+
             '/auth/password',
+
             'PUT',
+
             {
-                oldPassword: oldPassword,
-                newPassword: newPassword
+                oldPassword:
+                    oldPassword,
+
+                newPassword:
+                    newPassword
             }
+
         );
 
 
@@ -2446,36 +4854,12 @@ async function changePassword() {
     }
 }
 
-async function changePassword() {
-    try {
-        await api('/auth/password', 'PUT', {oldPassword: val('pw_old'), newPassword: val('pw_new')});
-        pageProfile('Đã đổi mật khẩu');
-    } catch (e) {
-        pageProfile(e.message, true);
-    }
-}
-
-/* ================= Tự động chuyển trạng thái khi đóng web ================= */
-
-window.addEventListener('beforeunload', () => {
-
-    if (!token) {
-        return;
-    }
-
-    fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-            'Authorization': 'Bearer ' + token,
-            'Content-Type': 'application/json'
-        },
-        keepalive: true
-    }).catch(() => {});
-
-});
-
-
 
 /* ================= Khởi động ================= */
-window.addEventListener('hashchange', render);
+
+window.addEventListener(
+    'hashchange',
+    render
+);
+
 render();

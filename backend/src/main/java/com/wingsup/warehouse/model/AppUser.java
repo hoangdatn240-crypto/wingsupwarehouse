@@ -5,7 +5,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
-
+import jakarta.persistence.Column;
+import java.time.LocalDateTime;
 @Entity
 @Table(name = "users")
 @Getter
@@ -35,6 +36,9 @@ public class AppUser {
 
     @Enumerated(EnumType.STRING)
     private Role role = Role.USER;
+
+    @Column(name = "last_active_at")
+    private LocalDateTime lastActiveAt;
 
     private boolean active = false;
 }

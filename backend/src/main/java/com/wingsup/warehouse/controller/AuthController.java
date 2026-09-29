@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
@@ -31,22 +32,22 @@ public class AuthController {
 
     public record LoginRequest(
             String username,
-            String password) {
-
+            String password
+    ) {
     }
 
     public record RegisterRequest(
             String username,
             String password,
             String fullName,
-            String email) {
-
+            String email
+    ) {
     }
 
     public record PasswordRequest(
             String oldPassword,
-            String newPassword) {
-
+            String newPassword
+    ) {
     }
 
     @PostMapping("/login")
@@ -75,7 +76,10 @@ public class AuthController {
             );
         }
 
+        // Đăng nhập thành công
         user.setActive(true);
+        user.setLastActiveAt(LocalDateTime.now());
+
         users.save(user);
 
         return Map.of(
@@ -84,8 +88,23 @@ public class AuthController {
         );
     }
 
-    @PostMapping(
-            "/register")
+    @PostMapping("/heartbeat")
+    public Map<String, String> heartbeat(
+            @RequestAttribute("user") AppUser me
+    ) {
+
+        me.setActive(true);
+        me.setLastActiveAt(LocalDateTime.now());
+
+        users.save(me);
+
+        return Map.of(
+                "message",
+                "OK"
+        );
+    }
+
+    @PostMapping("/register")
     public Map<String, String> register(
             @RequestBody RegisterRequest req
     ) {
@@ -132,12 +151,6 @@ public class AuthController {
             );
         }
 
-        if (req.password().length() < 6) {
-            throw new IllegalArgumentException(
-                    "Mật khẩu phải từ 6 ký tự"
-            );
-        }
-
         if (req.fullName() == null || req.fullName().isBlank()) {
             throw new IllegalArgumentException(
                     "Họ tên không được để trống"
@@ -174,6 +187,7 @@ public class AuthController {
 
         // Tài khoản mới chưa đăng nhập
         user.setActive(false);
+        user.setLastActiveAt(null);
 
         users.save(user);
 
@@ -190,6 +204,8 @@ public class AuthController {
     ) {
 
         me.setActive(false);
+        me.setLastActiveAt(null);
+
         users.save(me);
 
         tokens.remove(
