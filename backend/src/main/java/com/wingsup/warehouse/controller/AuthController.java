@@ -49,8 +49,7 @@ public class AuthController {
 
     }
 
-
-@PostMapping("/login")
+    @PostMapping("/login")
     public Map<String, Object> login(@RequestBody LoginRequest req) {
 
         if (req.username() == null || req.username().isBlank()) {
@@ -85,10 +84,8 @@ public class AuthController {
         );
     }
 
-
     @PostMapping(
-
-    "/register")
+            "/register")
     public Map<String, String> register(
             @RequestBody RegisterRequest req
     ) {
@@ -218,23 +215,79 @@ public class AuthController {
             @RequestBody PasswordRequest req
     ) {
 
+        // Kiểm tra mật khẩu cũ
+        if (req == null
+                || req.oldPassword() == null
+                || req.oldPassword().isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "Mật khẩu cũ không được để trống"
+            );
+        }
+
         if (!encoder.matches(
                 req.oldPassword(),
                 me.getPassword()
         )) {
+
             throw new IllegalArgumentException(
                     "Mật khẩu cũ không đúng"
             );
         }
 
+        // Kiểm tra mật khẩu mới
         if (req.newPassword() == null
-                || req.newPassword().length() < 6) {
+                || req.newPassword().isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "Mật khẩu mới không được để trống"
+            );
+        }
+
+        if (req.newPassword().length() < 6) {
 
             throw new IllegalArgumentException(
                     "Mật khẩu mới phải từ 6 ký tự"
             );
         }
 
+        if (!req.newPassword().matches(".*[A-Z].*")) {
+
+            throw new IllegalArgumentException(
+                    "Mật khẩu mới phải có ít nhất 1 chữ hoa"
+            );
+        }
+
+        if (!req.newPassword().matches(".*[0-9].*")) {
+
+            throw new IllegalArgumentException(
+                    "Mật khẩu mới phải có ít nhất 1 chữ số"
+            );
+        }
+
+        if (!req.newPassword().matches(".*[^a-zA-Z0-9].*")) {
+
+            throw new IllegalArgumentException(
+                    "Mật khẩu mới phải có ít nhất 1 ký tự đặc biệt"
+            );
+        }
+
+        if (encoder.matches(
+                req.newPassword(),
+                me.getPassword()
+        )) {
+
+            throw new IllegalArgumentException(
+                    "Mật khẩu mới phải khác mật khẩu cũ"
+            );
+        }
+
+        // Đảm bảo email không bị null/rỗng
+        if (me.getEmail() == null || me.getEmail().isBlank()) {
+            me.setEmail("admin@wingsup.com");
+        }
+
+        // Đổi mật khẩu
         me.setPassword(
                 encoder.encode(req.newPassword())
         );
@@ -243,7 +296,7 @@ public class AuthController {
 
         return Map.of(
                 "message",
-                "Đã đổi mật khẩu"
+                "Đổi mật khẩu thành công"
         );
     }
 }

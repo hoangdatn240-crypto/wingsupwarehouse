@@ -2265,18 +2265,185 @@ function lectureSearch() {
 
 /* ================= Tài khoản ================= */
 function pageProfile(msg = '', isError = false) {
+
     draw(`
-    <h1>Tài khoản</h1>
-    <div class="panel"><p><b>${esc(user.fullName)}</b> · ${esc(user.username)} · ${esc(user.role)}</p></div>
-    <div class="panel">
-      <h2>Đổi mật khẩu</h2>
-      ${isError ? err(msg) : okMsg(msg)}
-      <div class="form">
-        <label>Mật khẩu cũ <input id="pw_old" type="password"></label>
-        <label>Mật khẩu mới (từ 6 ký tự) <input id="pw_new" type="password"></label>
-        <button class="btn" onclick="changePassword()">Đổi mật khẩu</button>
-      </div>
-    </div>`);
+        <h1>👤 Tài khoản</h1>
+
+        <div class="panel">
+
+            <h2>Thông tin tài khoản</h2>
+
+            <p>
+                <b>Họ tên:</b>
+                ${esc(user.fullName || '')}
+            </p>
+
+            <p>
+                <b>Tên đăng nhập:</b>
+                ${esc(user.username || '')}
+            </p>
+
+            <p>
+                <b>Vai trò:</b>
+                ${esc(user.role || '')}
+            </p>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h2>🔐 Đổi mật khẩu</h2>
+
+            ${isError ? err(msg) : okMsg(msg)}
+
+            <div class="form">
+
+                <label>
+                    Mật khẩu hiện tại
+
+                    <input
+                        id="pw_old"
+                        type="password"
+                        placeholder="Nhập mật khẩu hiện tại"
+                        autocomplete="current-password"
+                    >
+                </label>
+
+
+                <label>
+                    Mật khẩu mới
+
+                    <input
+                        id="pw_new"
+                        type="password"
+                        placeholder="Mật khẩu mới (từ 6 ký tự)"
+                        autocomplete="new-password"
+                    >
+                </label>
+
+
+                <label>
+                    Xác nhận mật khẩu mới
+
+                    <input
+                        id="pw_confirm"
+                        type="password"
+                        placeholder="Nhập lại mật khẩu mới"
+                        autocomplete="new-password"
+                    >
+                </label>
+
+
+                <div
+                    class="actions"
+                    style="margin-top:12px"
+                >
+
+                    <button
+                        class="btn"
+                        onclick="changePassword()"
+                    >
+                        🔐 Đổi mật khẩu
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    `);
+}
+
+
+async function changePassword() {
+
+    const oldPassword = val('pw_old');
+    const newPassword = val('pw_new');
+    const confirmPassword = val('pw_confirm');
+
+
+    // ================= KIỂM TRA =================
+
+    if (!oldPassword) {
+        pageProfile(
+            'Mật khẩu hiện tại không được để trống',
+            true
+        );
+        return;
+    }
+
+
+    if (!newPassword) {
+        pageProfile(
+            'Mật khẩu mới không được để trống',
+            true
+        );
+        return;
+    }
+
+
+    if (newPassword.length < 6) {
+        pageProfile(
+            'Mật khẩu mới phải từ 6 ký tự',
+            true
+        );
+        return;
+    }
+
+
+    if (!confirmPassword) {
+        pageProfile(
+            'Vui lòng xác nhận mật khẩu mới',
+            true
+        );
+        return;
+    }
+
+
+    if (newPassword !== confirmPassword) {
+        pageProfile(
+            'Mật khẩu xác nhận không khớp',
+            true
+        );
+        return;
+    }
+
+
+    if (oldPassword === newPassword) {
+        pageProfile(
+            'Mật khẩu mới phải khác mật khẩu hiện tại',
+            true
+        );
+        return;
+    }
+
+
+    // ================= GỌI API =================
+
+    try {
+
+        await api(
+            '/auth/password',
+            'PUT',
+            {
+                oldPassword: oldPassword,
+                newPassword: newPassword
+            }
+        );
+
+
+        pageProfile(
+            'Đổi mật khẩu thành công!'
+        );
+
+    } catch (e) {
+
+        pageProfile(
+            e.message,
+            true
+        );
+    }
 }
 
 async function changePassword() {
@@ -2287,6 +2454,27 @@ async function changePassword() {
         pageProfile(e.message, true);
     }
 }
+
+/* ================= Tự động chuyển trạng thái khi đóng web ================= */
+
+window.addEventListener('beforeunload', () => {
+
+    if (!token) {
+        return;
+    }
+
+    fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+        },
+        keepalive: true
+    }).catch(() => {});
+
+});
+
+
 
 /* ================= Khởi động ================= */
 window.addEventListener('hashchange', render);
