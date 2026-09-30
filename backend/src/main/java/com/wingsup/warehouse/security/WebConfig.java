@@ -1,3 +1,4 @@
+
 package com.wingsup.warehouse.security;
 
 import org.springframework.context.annotation.Bean;
@@ -28,7 +29,9 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
                         "/api/auth/login",
-                        "/api/auth/register"
+                        "/api/auth/register",
+                        "/api/auth/forgot-password",
+                        "/api/auth/reset-password"
                 );
     }
 
@@ -40,3 +43,4 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedHeaders("*");
     }
 }
+
