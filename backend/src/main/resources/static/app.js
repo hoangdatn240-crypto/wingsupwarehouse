@@ -1,4 +1,4 @@
-alert("APP.JS MỚI ĐÃ ĐƯỢC LOAD");
+
 /* ================= Tiện ích ================= */
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
             '&': '&amp;',
@@ -409,9 +409,7 @@ function layout() {
     ];
 
 
-    /*
-     * ADMIN và MANAGER được dùng Danh mục
-     */
+    /* ADMIN và MANAGER được dùng Danh mục */
 
     if (
             isAdmin() ||
@@ -424,9 +422,7 @@ function layout() {
     }
 
 
-    /*
-     * Chỉ ADMIN được thấy Người dùng
-     */
+    /* Chỉ ADMIN được thấy Người dùng */
 
     if (isAdmin()) {
 
@@ -442,79 +438,149 @@ function layout() {
 
     document.getElementById('app').innerHTML = `
 
-    <header class="topbar">
+        <header class="topbar">
 
-        <div class="brand">
+            <a href="#/" class="brand" onclick="closeMobileMenu()">
             Wings <b>Up</b> · Kho
-        </div>
-
-        <nav class="nav">
-
-            ${links.map(([h, t]) =>
-            `<a
-                    href="${h}"
-                    class="${here === h ? 'active' : ''}"
-                >
-                    ${t}
-                </a>`
-    ).join('')}
-
-        </nav>
-
-
-        <!-- ================= THÔNG BÁO ================= -->
-
-        <div class="notification-box">
-
-            <a href="#/notifications">
-
-                🔔 Thông báo
-
-                <span id="notificationBadge"></span>
-
             </a>
 
-        </div>
+
+            <!-- NÚT 3 GẠCH - MOBILE -->
+
+            <button
+                type="button"
+                class="menu-toggle"
+                onclick="toggleMobileMenu()"
+                aria-label="Mở menu"
+            >
+                ☰
+            </button>
 
 
-        <!-- ================= TÀI KHOẢN ================= -->
+            <!-- MENU -->
 
-        <div class="who">
+            <nav
+                class="nav"
+                id="mainNav"
+            >
 
-            <a href="#/profile">
+                ${links.map(([h, t]) =>
+            `<a
+                        href="${h}"
+                        class="${here === h ? 'active' : ''}"
+                        onclick="closeMobileMenu()"
+                    >
+                        ${t}
+                    </a>`
+    ).join('')}
 
-                ${esc(
+
+                <!-- THÔNG BÁO TRONG MENU 3 GẠCH -->
+
+                <a
+                    href="#/notifications"
+                    class="mobile-notification"
+                    onclick="closeMobileMenu()"
+                >
+                    🔔 Thông báo
+
+                    <span id="notificationBadgeMobile"></span>
+                </a>
+
+            </nav>
+
+
+            <!-- ================= THÔNG BÁO PC ================= -->
+
+            <div class="notification-box">
+
+                <a
+                    href="#/notifications"
+                >
+
+                    🔔 Thông báo
+
+                    <span id="notificationBadge"></span>
+
+                </a>
+
+            </div>
+
+
+            <!-- ================= TÀI KHOẢN ================= -->
+
+            <div class="who">
+
+                <a
+                    href="#/profile"
+                    onclick="closeMobileMenu()"
+                >
+
+                    ${esc(
             user.fullName ||
             user.username
             )}
 
-                (${esc(user.role)})
+                    (${esc(user.role)})
 
-            </a>
-
-
-            <a
-                href="#"
-                onclick="logout(); return false;"
-            >
-                Đăng xuất
-            </a>
-
-        </div>
-
-    </header>
+                </a>
 
 
-    <main id="content"></main>
+                <a
+                    href="#"
+                    onclick="
+                        closeMobileMenu();
+                        logout();
+                        return false;
+                    "
+                >
+                    Đăng xuất
+                </a>
+
+            </div>
+
+        </header>
+
+
+        <main id="content"></main>
 
     `;
 
 
     /*
-     * Cập nhật số thông báo ngay khi layout tạo xong.
+     * Cập nhật số thông báo
      */
 
     updateNotificationBadge();
+}
+
+/* ================= MENU MOBILE ================= */
+
+function toggleMobileMenu() {
+
+    const nav =
+            document.getElementById('mainNav');
+
+    if (!nav) {
+        return;
+    }
+
+    nav.classList.toggle('mobile-open');
+}
+
+
+/* ================= ĐÓNG MENU MOBILE ================= */
+
+function closeMobileMenu() {
+
+    const nav =
+            document.getElementById('mainNav');
+
+    if (!nav) {
+        return;
+    }
+
+    nav.classList.remove('mobile-open');
 }
 
 
@@ -855,11 +921,11 @@ async function sendForgotCode() {
         alert("⏳ Đang gửi mã OTP...");
 
         const result = await api(
-            "/auth/forgot-password",
-            "POST",
-            {
-                email: email
-            }
+                "/auth/forgot-password",
+                "POST",
+                {
+                    email: email
+                }
         );
 
         console.log("Kết quả gửi OTP:", result);
@@ -872,18 +938,18 @@ async function sendForgotCode() {
         }
 
         alert(
-            "✅ Mã OTP đã được gửi!\n\n" +
-            "Vui lòng kiểm tra email:\n" +
-            email
-        );
+                "✅ Mã OTP đã được gửi!\n\n" +
+                "Vui lòng kiểm tra email:\n" +
+                email
+                );
 
     } catch (error) {
         console.error("LỖI GỬI OTP:", error);
 
         alert(
-            "❌ Không thể gửi mã OTP!\n\n" +
-            (error?.message || "Có lỗi xảy ra, vui lòng thử lại.")
-        );
+                "❌ Không thể gửi mã OTP!\n\n" +
+                (error?.message || "Có lỗi xảy ra, vui lòng thử lại.")
+                );
     }
 }
 
@@ -893,25 +959,25 @@ async function sendForgotCode() {
 async function resetForgotPassword() {
 
     const email =
-        val('forgot_email').trim();
+            val('forgot_email').trim();
 
     const code =
-        val('forgot_code').trim();
+            val('forgot_code').trim();
 
     const password =
-        val('forgot_new_password');
+            val('forgot_new_password');
 
     const confirmPassword =
-        val('forgot_confirm_password');
+            val('forgot_confirm_password');
 
     const message =
-        document.getElementById('forgotMessage');
+            document.getElementById('forgotMessage');
 
 
     if (!email) {
 
         message.innerHTML =
-            err('Email không được để trống');
+                err('Email không được để trống');
 
         return;
     }
@@ -920,7 +986,7 @@ async function resetForgotPassword() {
     if (!code) {
 
         message.innerHTML =
-            err('Mã OTP không được để trống');
+                err('Mã OTP không được để trống');
 
         return;
     }
@@ -929,7 +995,7 @@ async function resetForgotPassword() {
     if (!/^\d{6}$/.test(code)) {
 
         message.innerHTML =
-            err('Mã OTP phải gồm 6 chữ số');
+                err('Mã OTP phải gồm 6 chữ số');
 
         return;
     }
@@ -938,7 +1004,7 @@ async function resetForgotPassword() {
     if (!password) {
 
         message.innerHTML =
-            err('Mật khẩu mới không được để trống');
+                err('Mật khẩu mới không được để trống');
 
         return;
     }
@@ -947,7 +1013,7 @@ async function resetForgotPassword() {
     if (password.length < 6) {
 
         message.innerHTML =
-            err('Mật khẩu mới phải từ 6 ký tự');
+                err('Mật khẩu mới phải từ 6 ký tự');
 
         return;
     }
@@ -956,7 +1022,7 @@ async function resetForgotPassword() {
     if (!confirmPassword) {
 
         message.innerHTML =
-            err('Vui lòng nhập lại mật khẩu');
+                err('Vui lòng nhập lại mật khẩu');
 
         return;
     }
@@ -965,7 +1031,7 @@ async function resetForgotPassword() {
     if (password !== confirmPassword) {
 
         message.innerHTML =
-            err('Mật khẩu nhập lại không khớp');
+                err('Mật khẩu nhập lại không khớp');
 
         return;
     }
@@ -974,20 +1040,20 @@ async function resetForgotPassword() {
     try {
 
         await api(
-            '/auth/reset-password',
-            'POST',
-            {
-                email: email,
-                code: code,
-                newPassword: password
-            }
+                '/auth/reset-password',
+                'POST',
+                {
+                    email: email,
+                    code: code,
+                    newPassword: password
+                }
         );
 
 
         alert(
-            '✅ Đặt lại mật khẩu thành công!\n' +
-            'Vui lòng đăng nhập lại.'
-        );
+                '✅ Đặt lại mật khẩu thành công!\n' +
+                'Vui lòng đăng nhập lại.'
+                );
 
 
         pageLogin();
@@ -995,7 +1061,7 @@ async function resetForgotPassword() {
     } catch (e) {
 
         message.innerHTML =
-            err(e.message);
+                err(e.message);
     }
 }
 

@@ -1,83 +1,974 @@
-
 :root {
-  --ink: #1c2434;
-  --muted: #667085;
-  --brand: #1f4fd8;
-  --brand-dark: #173aa3;
-  --accent: #f2a900;
-  --bg: #f4f6fa;
-  --panel: #ffffff;
-  --line: #dde2ec;
-  --danger: #c93c3c;
-  --ok: #1f8a5b;
-  --warn: #b7791f;
+    --ink: #1c2434;
+    --muted: #667085;
+    --brand: #1f4fd8;
+    --brand-dark: #173aa3;
+    --accent: #f2a900;
+    --bg: #f4f6fa;
+    --panel: #ffffff;
+    --line: #dde2ec;
+    --danger: #c93c3c;
+    --ok: #1f8a5b;
+    --warn: #b7791f;
 }
-* { box-sizing: border-box; }
-body { margin: 0; font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; }
-a { color: inherit; text-decoration: none; }
 
-.topbar { background: var(--ink); color: #fff; display: flex; align-items: center; gap: 24px; padding: 0 24px; min-height: 56px; flex-wrap: wrap; }
-.brand { font-weight: 700; font-size: 18px; letter-spacing: .2px; }
-.brand b { color: var(--accent); }
-.nav { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
-.nav a { padding: 16px 12px; color: #c8d0e0; border-bottom: 3px solid transparent; }
-.nav a.active { color: #fff; border-bottom-color: var(--accent); }
-.who { display: flex; align-items: center; gap: 12px; font-size: 14px; }
-.who a { color: #c8d0e0; text-decoration: underline; }
+/* =========================
+   RESET
+========================= */
 
-main { max-width: 1120px; margin: 0 auto; padding: 24px; }
-h1 { font-size: 22px; margin: 0 0 16px; }
-h2 { font-size: 16px; margin: 0 0 12px; }
+* {
+    box-sizing: border-box;
+}
 
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px; }
-.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
-.stat span { color: var(--muted); font-size: 13px; }
-.stat strong { display: block; font-size: 26px; margin-top: 2px; }
-.stat.alert strong { color: var(--danger); }
+html {
+    width: 100%;
+    min-height: 100%;
+    overflow-x: hidden;
+}
 
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-th { color: var(--muted); font-weight: 600; background: #fafbfd; }
-.table-wrap { overflow-x: auto; }
-.num { text-align: right; }
-.empty { color: var(--muted); padding: 16px 0; }
+body {
+    margin: 0;
+    width: 100%;
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    overflow-x: hidden;
+}
 
-.form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: end; }
-label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
-label.check { display: flex; align-items: center; gap: 8px; color: var(--ink); }
-input, select, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
-input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+a {
+    color: inherit;
+    text-decoration: none;
+}
 
-.btn { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--brand); background: var(--brand); color: #fff; cursor: pointer; }
-.btn:hover { background: var(--brand-dark); }
-.btn.ghost { background: #fff; color: var(--brand); }
-.btn.ghost:hover { background: #eef2ff; }
-.btn.danger { background: #fff; color: var(--danger); border-color: var(--danger); }
-.btn.danger:hover { background: #fdeeee; }
-.btn.ok { background: var(--ok); border-color: var(--ok); }
-.btn.small { padding: 4px 10px; font-size: 13px; }
-.actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.toolbar { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-.toolbar input { flex: 1; min-width: 200px; }
+button,
+input,
+select,
+textarea {
+    -webkit-tap-highlight-color: transparent;
+}
 
-.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
-.badge.PENDING { background: #fff4d6; color: var(--warn); }
-.badge.APPROVED, .badge.IN { background: #dcf5e8; color: var(--ok); }
-.badge.REJECTED { background: #fbe1e1; color: var(--danger); }
-.badge.OUT { background: #e3eaff; color: var(--brand); }
-.low { color: var(--danger); font-weight: 600; }
+/* =========================
+   TOPBAR
+========================= */
 
-.msg { padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 14px; }
-.msg.error { background: #fbe1e1; color: var(--danger); }
-.msg.success { background: #dcf5e8; color: var(--ok); }
+.topbar {
+    background: var(--ink);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 0 24px;
+    min-height: 56px;
+    flex-wrap: wrap;
+}
 
-.login-page { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
-.login-box { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 28px; }
-.login-box h1 { margin-bottom: 4px; }
-.login-box p { margin: 0 0 20px; color: var(--muted); }
-.login-box label { margin-bottom: 12px; }
-.login-box .btn { width: 100%; }
-.hint { margin-top: 16px; font-size: 13px; color: var(--muted); }
+.brand {
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: .2px;
+    white-space: nowrap;
+}
 
-@media (max-width: 640px) { main { padding: 16px; } .nav a { padding: 10px 8px; } }
+.brand b {
+    color: var(--accent);
+}
+
+/* =========================
+   MENU PC
+========================= */
+
+.nav {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.nav a {
+    padding: 16px 12px;
+    color: #c8d0e0;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+}
+
+.nav a.active {
+    color: #fff;
+    border-bottom-color: var(--accent);
+}
+
+/* =========================
+   NÚT 3 GẠCH
+========================= */
+
+.menu-toggle {
+    display: none;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 28px;
+    line-height: 1;
+    padding: 6px 8px;
+    cursor: pointer;
+}
+
+.menu-toggle:active {
+    transform: scale(.92);
+}
+
+/* =========================
+   THÔNG BÁO PC
+========================= */
+
+.notification-box {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.notification-box a {
+    color: #c8d0e0;
+}
+
+.notification-box a:hover {
+    color: #fff;
+}
+
+/* Thông báo trong menu mobile
+   Mặc định PC không hiện */
+
+.mobile-notification {
+    display: none !important;
+}
+
+/* =========================
+   ACCOUNT
+========================= */
+
+.who {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.who a {
+    color: #c8d0e0;
+    text-decoration: underline;
+}
+
+/* =========================
+   MAIN
+========================= */
+
+main {
+    width: 100%;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+h1 {
+    font-size: 22px;
+    margin: 0 0 16px;
+}
+
+h2 {
+    font-size: 16px;
+    margin: 0 0 12px;
+}
+
+/* =========================
+   PANEL
+========================= */
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+/* =========================
+   GRID / STAT
+========================= */
+
+.grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    margin-bottom: 20px;
+}
+
+.stat {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.stat span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.stat strong {
+    display: block;
+    font-size: 26px;
+    margin-top: 2px;
+}
+
+.stat.alert strong {
+    color: var(--danger);
+}
+
+/* =========================
+   TABLE
+========================= */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+th,
+td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+}
+
+th {
+    color: var(--muted);
+    font-weight: 600;
+    background: #fafbfd;
+}
+
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap table {
+    min-width: 650px;
+}
+
+.num {
+    text-align: right;
+}
+
+.empty {
+    color: var(--muted);
+    padding: 16px 0;
+}
+
+/* =========================
+   FORM
+========================= */
+
+.form {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    align-items: end;
+}
+
+label {
+    display: grid;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+label.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink);
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    font: inherit;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+}
+
+textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 1px;
+}
+
+/* =========================
+   BUTTON
+========================= */
+
+.btn {
+    font: inherit;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--brand);
+    background: var(--brand);
+    color: #fff;
+    cursor: pointer;
+    transition: .15s ease;
+}
+
+.btn:hover {
+    background: var(--brand-dark);
+}
+
+.btn.ghost {
+    background: #fff;
+    color: var(--brand);
+}
+
+.btn.ghost:hover {
+    background: #eef2ff;
+}
+
+.btn.danger {
+    background: #fff;
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.btn.danger:hover {
+    background: #fdeeee;
+}
+
+.btn.ok {
+    background: var(--ok);
+    border-color: var(--ok);
+}
+
+.btn.small {
+    padding: 4px 10px;
+    font-size: 13px;
+}
+
+.actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.toolbar input {
+    flex: 1;
+    min-width: 200px;
+}
+
+/* =========================
+   BADGE
+========================= */
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge.PENDING {
+    background: #fff4d6;
+    color: var(--warn);
+}
+
+.badge.APPROVED,
+.badge.IN {
+    background: #dcf5e8;
+    color: var(--ok);
+}
+
+.badge.REJECTED {
+    background: #fbe1e1;
+    color: var(--danger);
+}
+
+.badge.OUT {
+    background: #e3eaff;
+    color: var(--brand);
+}
+
+.low {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+/* =========================
+   MESSAGE
+========================= */
+
+.msg {
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.msg.error {
+    background: #fbe1e1;
+    color: var(--danger);
+}
+
+.msg.success {
+    background: #dcf5e8;
+    color: var(--ok);
+}
+
+/* =========================
+   LOGIN
+========================= */
+
+.login-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+}
+
+.login-box {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 28px;
+    box-shadow: 0 8px 30px rgba(28, 36, 52, .08);
+}
+
+.login-box h1 {
+    margin-bottom: 4px;
+}
+
+.login-box p {
+    margin: 0 0 20px;
+    color: var(--muted);
+}
+
+.login-box label {
+    margin-bottom: 12px;
+}
+
+.login-box input,
+.login-box select {
+    min-height: 44px;
+}
+
+.login-box .btn {
+    width: 100%;
+    min-height: 44px;
+}
+
+.hint {
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+/* =====================================================
+   MOBILE
+===================================================== */
+
+@media (max-width: 640px) {
+
+    body {
+        font-size: 14px;
+    }
+
+    /* =========================
+       TOPBAR MOBILE
+    ========================= */
+
+    .topbar {
+        position:relative;
+        display:flex;
+        align-items:center;
+        justify-content:flex-start;
+        min-height:58px;
+        padding:10px 14px;
+        gap:8px;
+        flex-wrap:nowrap;
+    }
+
+    .brand {
+        width:auto;
+        flex:1;
+        font-size:17px;
+        order:1;
+    }
+
+    /* Hiện nút 3 gạch */
+
+    .menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+    }
+
+    /* =========================
+       MENU MOBILE
+    ========================= */
+
+    .nav {
+        display: none;
+
+        position: absolute;
+
+        top: 58px;
+        left: 0;
+        right: 0;
+
+        width: 100%;
+
+        flex-direction: column;
+        flex-wrap: nowrap;
+
+        gap: 0;
+
+        background: var(--ink);
+
+        border-top: 1px solid rgba(255, 255, 255, .1);
+
+        box-shadow: 0 8px 20px rgba(0, 0, 0, .2);
+
+        z-index: 9999;
+
+        padding: 6px 0;
+    }
+
+    /* Khi bấm ☰ */
+
+    .nav.mobile-open {
+        display: flex;
+    }
+
+    /* Từng menu */
+
+    .nav a {
+        display: flex;
+        align-items: center;
+
+        width: 100%;
+
+        padding: 14px 18px;
+
+        color: #c8d0e0;
+
+        border-bottom: 1px solid rgba(255, 255, 255, .08);
+
+        font-size: 14px;
+    }
+
+    .nav a:last-child {
+        border-bottom: 0;
+    }
+
+    .nav a.active {
+        color: #fff;
+
+        background: rgba(255, 255, 255, .08);
+
+        border-bottom-color: transparent;
+
+        border-left: 3px solid var(--accent);
+
+        padding-left: 15px;
+    }
+
+    .nav a:active {
+        background: rgba(255, 255, 255, .12);
+    }
+
+    /* =========================
+       THÔNG BÁO TRONG MENU
+    ========================= */
+
+    .notification-box {
+        display: none !important;
+    }
+
+    .mobile-notification {
+        display: flex !important;
+        align-items: center;
+
+        width: 100%;
+
+        padding: 14px 18px;
+
+        color: #c8d0e0;
+
+        font-size: 14px;
+
+        border-bottom: 1px solid rgba(255, 255, 255, .08);
+    }
+
+    .mobile-notification:hover {
+        background: rgba(255, 255, 255, .08);
+    }
+
+    .mobile-notification span {
+        margin-left: 6px;
+    }
+
+    /* =========================
+       ACCOUNT MOBILE
+    ========================= */
+
+    .who {
+        width: auto;
+        flex-shrink: 0;
+    }
+
+    .who {
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-shrink:0;
+        font-size:12px;
+    }
+
+    .who a:first-child {
+        display:block;
+        max-width:130px;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+    }
+
+    .who a:last-child {
+        font-size:12px;
+    }
+
+    .who a:last-child {
+        font-size: 13px;
+    }
+
+    /* =========================
+       MAIN
+    ========================= */
+
+    main {
+        width: 100%;
+        padding: 14px 12px;
+    }
+
+    h1 {
+        font-size: 20px;
+        margin-bottom: 14px;
+    }
+
+    h2 {
+        font-size: 16px;
+    }
+
+    /* =========================
+       PANEL
+    ========================= */
+
+    .panel {
+        padding: 13px;
+        border-radius: 10px;
+        margin-bottom: 14px;
+    }
+
+    /* =========================
+       DASHBOARD
+    ========================= */
+
+    .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .stat {
+        padding: 13px;
+        border-radius: 10px;
+        min-width: 0;
+    }
+
+    .stat span {
+        display: block;
+        font-size: 12px;
+        line-height: 1.35;
+    }
+
+    .stat strong {
+        font-size: 22px;
+        margin-top: 4px;
+    }
+
+    /* =========================
+       FORM
+    ========================= */
+
+    .form {
+        grid-template-columns: 1fr;
+        gap: 11px;
+    }
+
+    label {
+        font-size: 12px;
+    }
+
+    input,
+    select,
+    textarea {
+        min-height: 44px;
+        padding: 10px 11px;
+        border-radius: 8px;
+        font-size: 15px;
+    }
+
+    textarea {
+        min-height: 100px;
+    }
+
+    /* =========================
+       BUTTON
+    ========================= */
+
+    .btn {
+        min-height: 44px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .btn.small {
+        min-height: 38px;
+        padding: 8px 11px;
+        font-size: 13px;
+    }
+
+    .actions {
+        width: 100%;
+        gap: 7px;
+    }
+
+    .actions .btn {
+        flex: 1;
+        min-width: 100px;
+    }
+
+    /* =========================
+       TOOLBAR
+    ========================= */
+
+    .toolbar {
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+    }
+
+    .toolbar input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .toolbar .btn {
+        width: 100%;
+    }
+
+    /* =========================
+       TABLE
+    ========================= */
+
+    .table-wrap {
+        margin-left: -13px;
+        margin-right: -13px;
+        width: calc(100% + 26px);
+
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .table-wrap table {
+        min-width: 680px;
+        font-size: 13px;
+    }
+
+    th,
+    td {
+        padding: 9px 10px;
+        white-space: nowrap;
+    }
+
+    /* =========================
+       MESSAGE
+    ========================= */
+
+    .msg {
+        font-size: 13px;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    /* =========================
+       LOGIN
+    ========================= */
+
+    .login-page {
+        min-height: 100dvh;
+        padding: 14px;
+        align-items: center;
+    }
+
+    .login-box {
+        width: 100%;
+        max-width: 100%;
+        padding: 22px 18px;
+        border-radius: 14px;
+        box-shadow: 0 8px 30px rgba(28, 36, 52, .08);
+    }
+
+    .login-box h1 {
+        font-size: 21px;
+        text-align: center;
+    }
+
+    .login-box h2 {
+        font-size: 18px;
+        text-align: center;
+        margin-top: 8px;
+    }
+
+    .login-box p {
+        text-align: center;
+        font-size: 13px;
+        margin-bottom: 18px;
+    }
+
+    .login-box label {
+        margin-bottom: 12px;
+    }
+
+    .login-box input {
+        min-height: 46px;
+        font-size: 15px;
+    }
+
+    .login-box .btn {
+        min-height: 46px;
+        font-size: 15px;
+    }
+
+    /* =========================
+       RESET PASSWORD
+    ========================= */
+
+    #resetForm {
+        margin-top: 16px !important;
+        padding-top: 15px;
+        border-top: 1px solid var(--line);
+    }
+
+    #forgotMessage {
+        font-size: 13px;
+    }
+}
+
+/* =====================================================
+   ĐIỆN THOẠI RẤT NHỎ
+===================================================== */
+
+@media (max-width: 380px) {
+
+    .topbar {
+        padding: 8px 10px;
+    }
+
+    .brand {
+        font-size: 16px;
+    }
+
+    .menu-toggle {
+        width: 42px;
+        height: 42px;
+        font-size: 26px;
+    }
+
+    .nav {
+        top: 54px;
+    }
+
+    main {
+        padding: 12px 10px;
+    }
+
+    .grid {
+        gap: 8px;
+    }
+
+    .stat {
+        padding: 11px;
+    }
+
+    .stat strong {
+        font-size: 20px;
+    }
+
+    .login-page {
+        padding: 10px;
+    }
+
+    .login-box {
+        padding: 20px 15px;
+    }
+
+    .login-box h1 {
+        font-size: 19px;
+    }
+
+    .login-box h2 {
+        font-size: 17px;
+    }
+}
+
+/* =====================================================
+   LANDSCAPE MOBILE
+===================================================== */
+
+@media (max-width: 900px) and (orientation: landscape) {
+
+    .login-page {
+        align-items: flex-start;
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+
+    .login-box {
+        max-width: 420px;
+    }
+}
