@@ -92,62 +92,86 @@ public class AuthController {
     // =========================================================
 
     @PostMapping("/login")
-    public Map<String, Object> login(
-            @RequestBody LoginRequest req
-    ) {
+public Map<String, Object> login(
+        @RequestBody LoginRequest req
+) {
 
-        if (req.username() == null
-                || req.username().isBlank()) {
+    System.out.println("========== LOGIN ==========");
+    System.out.println("Username nhận được: " + req.username());
+    System.out.println("Password có dữ liệu: "
+            + (req.password() != null && !req.password().isBlank()));
 
-            throw new IllegalArgumentException(
-                    "Tên đăng nhập không được để trống"
-            );
-        }
+    if (req.username() == null
+            || req.username().isBlank()) {
 
-        if (req.password() == null
-                || req.password().isBlank()) {
-
-            throw new IllegalArgumentException(
-                    "Mật khẩu không được để trống"
-            );
-        }
-
-        AppUser user =
-                users.findByUsername(
-                        req.username().trim()
-                )
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Tài khoản không tồn tại"
-                        )
-                );
-
-        if (!encoder.matches(
-                req.password(),
-                user.getPassword()
-        )) {
-
-            throw new IllegalArgumentException(
-                    "Mật khẩu không đúng"
-            );
-        }
-
-        user.setActive(true);
-
-        user.setLastActiveAt(
-                LocalDateTime.now()
-        );
-
-        users.save(user);
-
-        return Map.of(
-                "token",
-                tokens.create(user.getId()),
-
-                "user",
-                user
+        throw new IllegalArgumentException(
+                "Tên đăng nhập không được để trống"
         );
     }
+
+    if (req.password() == null
+            || req.password().isBlank()) {
+
+        throw new IllegalArgumentException(
+                "Mật khẩu không được để trống"
+        );
+    }
+
+    String username = req.username().trim();
+
+    System.out.println("Đang tìm user: " + username);
+
+    AppUser user = users.findByUsername(username)
+            .orElseThrow(() ->
+                    new IllegalArgumentException(
+                            "Tài khoản không tồn tại: " + username
+                    )
+            );
+
+    System.out.println("Đã tìm thấy user ID: " + user.getId());
+
+    if (user.getPassword() == null
+            || user.getPassword().isBlank()) {
+
+        throw new IllegalArgumentException(
+                "Tài khoản chưa có mật khẩu trong database"
+        );
+    }
+
+    boolean passwordCorrect = encoder.matches(
+            req.password(),
+            user.getPassword()
+    );
+
+    System.out.println(
+            "Mật khẩu đúng: " + passwordCorrect
+    );
+
+    if (!passwordCorrect) {
+
+        throw new IllegalArgumentException(
+                "Mật khẩu không đúng"
+        );
+    }
+
+    user.setActive(true);
+
+    user.setLastActiveAt(
+            LocalDateTime.now()
+    );
+
+    users.save(user);
+
+    String token = tokens.create(user.getId());
+
+    System.out.println("LOGIN THÀNH CÔNG - User ID: "
+            + user.getId());
+
+    return Map.of(
+            "token", token,
+            "user", user
+    );
+}
 
     // =========================================================
     // HEARTBEAT

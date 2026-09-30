@@ -681,11 +681,14 @@ function pageLogin(msg = '') {
                     Đăng nhập hệ thống quản lý kho
                 </p>
 
-                ${err(msg)}
+                ${msg ? `
+                    <div class="login-error">
+                        ❌ ${esc(msg)}
+                    </div>
+                ` : ''}
 
                 <label>
                     Tên đăng nhập
-
                     <input
                         id="lu"
                         type="text"
@@ -695,7 +698,6 @@ function pageLogin(msg = '') {
 
                 <label>
                     Mật khẩu
-
                     <input
                         id="lp"
                         type="password"
@@ -710,7 +712,6 @@ function pageLogin(msg = '') {
                     margin-top:10px;
                     margin-bottom:15px;
                 ">
-
                     <a
                         href="javascript:void(0)"
                         onclick="showForgotPassword()"
@@ -723,7 +724,6 @@ function pageLogin(msg = '') {
                     >
                         Quên mật khẩu?
                     </a>
-
                 </div>
 
                 <button
@@ -735,7 +735,6 @@ function pageLogin(msg = '') {
                 </button>
 
                 <p style="margin-top:15px;">
-
                     Chưa có tài khoản?
 
                     <a
@@ -749,15 +748,92 @@ function pageLogin(msg = '') {
                     >
                         Đăng ký
                     </a>
-
                 </p>
 
             </div>
 
         </div>
-
     `;
+
+    document.getElementById('lp').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doLogin();
+        }
+    });
 }
+
+
+
+async function doLogin() {
+
+    const username = document.getElementById('lu')?.value.trim();
+    const password = document.getElementById('lp')?.value;
+
+    console.log('===== LOGIN =====');
+    console.log('Username:', username);
+    console.log('Password:', password ? 'ĐÃ NHẬP' : 'TRỐNG');
+
+    if (!username) {
+        pageLogin('Vui lòng nhập tên đăng nhập!');
+        return;
+    }
+
+    if (!password) {
+        pageLogin('Vui lòng nhập mật khẩu!');
+        return;
+    }
+
+    try {
+
+        console.log('Đang gọi /auth/login...');
+
+        const result = await api('/auth/login', 'POST', {
+            username: username,
+            password: password
+        });
+
+        console.log('LOGIN RESPONSE:', result);
+
+        user = result.user || result;
+
+        localStorage.setItem(
+                'user',
+                JSON.stringify(user)
+                );
+
+        if (result.token) {
+
+            token = result.token;
+
+            localStorage.setItem(
+                    'token',
+                    result.token
+                    );
+
+        } else {
+
+            pageLogin('Đăng nhập thất bại: không nhận được token.');
+            return;
+        }
+
+        location.hash = '#/';
+
+        render();
+
+    } catch (error) {
+
+        console.error('LOGIN ERROR:', error);
+
+        // HIỆN LỖI TRÊN GIAO DIỆN
+        pageLogin(
+                error?.message || 'Tên đăng nhập hoặc mật khẩu không đúng!'
+                );
+    }
+}
+
+
+
 
 function showForgotPassword() {
 
@@ -1111,6 +1187,17 @@ function showRegister(msg = '') {
                 >
 
             </label>
+     <label>
+            Xác nhận mật khẩu
+
+            <input
+                id="rcp"
+                type="password"
+                autocomplete="new-password"
+            >
+        </label>
+    
+             
   
 
 
@@ -1152,12 +1239,12 @@ function showRegister(msg = '') {
                 Đã có tài khoản?
 
                 <button
-                    class="btn ghost"
-                    onclick="pageLogin()"
-                >
-                    Đăng nhập
-                </button>
-
+    type="button"
+    class="btn ghost"
+    onclick="pageLogin()"
+>
+    Đăng nhập
+</button>
             </div>
 
         </div>
@@ -1247,18 +1334,27 @@ async function doRegister() {
 }
 
 
-async function doLogin() {
+async function doRegister() {
 
     const username =
-            val('lu').trim();
+            val('ru').trim();
 
     const password =
-            val('lp');
+            val('rp');
+
+    const confirmPassword =
+            val('rcp');
+
+    const fullName =
+            val('rf').trim();
+
+    const email =
+            val('re').trim();
 
 
     if (!username) {
 
-        pageLogin(
+        showRegister(
                 'Tên đăng nhập không được để trống'
                 );
 
@@ -1266,10 +1362,34 @@ async function doLogin() {
     }
 
 
-    if (!password) {
+    if (
+            !password ||
+            password.length < 6
+            ) {
 
-        pageLogin(
-                'Mật khẩu không được để trống'
+        showRegister(
+                'Mật khẩu phải từ 6 ký tự'
+                );
+
+        return;
+    }
+
+
+    // Kiểm tra xác nhận mật khẩu
+    if (!confirmPassword) {
+
+        showRegister(
+                'Vui lòng xác nhận mật khẩu'
+                );
+
+        return;
+    }
+
+
+    if (password !== confirmPassword) {
+
+        showRegister(
+                'Mật khẩu xác nhận không khớp'
                 );
 
         return;
@@ -1278,41 +1398,44 @@ async function doLogin() {
 
     try {
 
-        const data =
-                await api(
-                        '/auth/login',
-                        'POST',
-                        {
-                            username: username,
-                            password: password
-                        }
+        await api(
+                '/auth/register',
+                'POST',
+                {
+                    username: username,
+                    password: password,
+                    fullName: fullName,
+                    email: email
+                }
+        );
+
+
+        pageLogin();
+
+        alert(
+                'Tạo tài khoản thành công! Vui lòng đăng nhập.'
                 );
-
-
-        setSession(
-                data.token,
-                data.user
-                );
-
-
-        /*
-         * Reset danh sách notification
-         * khi đăng nhập tài khoản mới.
-         */
-
-        knownNotificationIds =
-                new Set();
-
-
-        location.hash = '#/';
-
-        render();
 
     } catch (e) {
 
-        pageLogin(e.message);
+        showRegister(e.message);
     }
 }
+
+
+/*
+ * Reset danh sách notification
+ * khi đăng nhập tài khoản mới.
+ */
+
+knownNotificationIds =
+        new Set();
+
+
+location.hash = '#/';
+
+render();
+
 
 
 async function logout() {

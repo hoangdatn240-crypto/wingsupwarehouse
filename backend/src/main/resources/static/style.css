@@ -972,3 +972,16 @@ button:focus-visible {
         max-width: 420px;
     }
 }
+
+.login-error {
+    width: 100%;
+    box-sizing: border-box;
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 10px 0 15px;
+    font-size: 14px;
+    font-weight: 500;
+}
