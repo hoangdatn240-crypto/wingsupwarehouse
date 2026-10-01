@@ -31,22 +31,54 @@ const STATUS = {
 };
 let token = localStorage.getItem('token');
 let user = JSON.parse(localStorage.getItem('user') || 'null');
+let isFirstLogin =
+        sessionStorage.getItem('wingsup_first_login') === 'true';
 const isAdmin = () => !!user && user.role === 'ADMIN';
 const isManager = () => !!user && user.role === 'MANAGER';
 const canManageWarehouse = () =>
     isAdmin() || isManager();
 function setSession(t, u) {
+
     token = t;
     user = u;
-    localStorage.setItem('token', t);
-    localStorage.setItem('user', JSON.stringify(u));
+
+    localStorage.setItem(
+            'token',
+            t
+            );
+
+    localStorage.setItem(
+            'user',
+            JSON.stringify(u)
+            );
+
+    /*
+     * Chỉ tồn tại trong lần mở web hiện tại.
+     * F5 / chuyển chức năng vẫn giữ.
+     * Đóng tab hoặc đăng xuất sẽ mất.
+     */
+    sessionStorage.setItem(
+            'wingsup_first_login',
+            'true'
+            );
+
+    isFirstLogin = true;
 }
 
+
 function clearSession() {
+
     token = null;
     user = null;
+
+    isFirstLogin = false;
+
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+
+    sessionStorage.removeItem(
+            'wingsup_first_login'
+            );
 }
 
 
@@ -357,7 +389,8 @@ function layout() {
         ['#/', '🏠 Trang Chủ'],
         ['#/products', '📦 Sản phẩm'],
         ['#/transactions', '🧾 Phiếu nhập/xuất'],
-        ['#/lectures', '📚 Bài giảng']
+        ['#/lectures', '📚 Bài giảng'],
+        ['#/special-requests', '💬 Yêu cầu đặc biệt']
     ];
     /* ADMIN và MANAGER được dùng Danh mục */
 
@@ -626,8 +659,13 @@ async function render() {
             return pageTransactions();
         case 'lectures':
             return pageLectures();
+
+        case 'special-requests':
+            return pageSpecialRequests();
+
         case 'notifications':
             return pageNotifications();
+
         case 'profile':
             return pageProfile();
         default:
@@ -741,60 +779,84 @@ function pageLogin(msg = '') {
 
 async function doLogin() {
 
-    const username = document.getElementById('lu')?.value.trim();
-    const password = document.getElementById('lp')?.value;
-    console.log('===== LOGIN =====');
-    console.log('Username:', username);
-    console.log('Password:', password ? 'ĐÃ NHẬP' : 'TRỐNG');
+    const username =
+            document.getElementById('lu')?.value.trim();
+
+    const password =
+            document.getElementById('lp')?.value;
+
+
     if (!username) {
-        pageLogin('Vui lòng nhập tên đăng nhập!');
+
+        pageLogin(
+                'Vui lòng nhập tên đăng nhập!'
+                );
+
         return;
     }
 
+
     if (!password) {
-        pageLogin('Vui lòng nhập mật khẩu!');
+
+        pageLogin(
+                'Vui lòng nhập mật khẩu!'
+                );
+
         return;
     }
+
 
     try {
 
-        console.log('Đang gọi /auth/login...');
-        const result = await api('/auth/login', 'POST', {
-            username: username,
-            password: password
-        });
-        console.log('LOGIN RESPONSE:', result);
-        user = result.user || result;
-        localStorage.setItem(
-                'user',
-                JSON.stringify(user)
+        const result =
+                await api(
+                        '/auth/login',
+                        'POST',
+                        {
+                            username: username,
+                            password: password
+                        }
                 );
-        if (result.token) {
 
-            token = result.token;
-            localStorage.setItem(
-                    'token',
-                    result.token
+
+        const loginUser =
+                result.user || result;
+
+
+        if (!result.token) {
+
+            pageLogin(
+                    'Đăng nhập thất bại: không nhận được token.'
                     );
-        } else {
 
-            pageLogin('Đăng nhập thất bại: không nhận được token.');
             return;
         }
 
+
+        setSession(
+                result.token,
+                loginUser
+                );
+
+
         location.hash = '#/';
+
         render();
+
+
     } catch (error) {
 
-        console.error('LOGIN ERROR:', error);
-        // HIỆN LỖI TRÊN GIAO DIỆN
+        console.error(
+                'LOGIN ERROR:',
+                error
+                );
+
         pageLogin(
-                error?.message || 'Tên đăng nhập hoặc mật khẩu không đúng!'
+                error?.message ||
+                'Tên đăng nhập hoặc mật khẩu không đúng!'
                 );
     }
 }
-
-
 
 
 function showForgotPassword() {
@@ -1335,144 +1397,155 @@ async function pageDashboard() {
                 isAdmin() ||
                 isManager();
 
+
         draw(`
 
-            <div class="welcome-banner">
+                 <!-- ================= CHÀO MỪNG ================= -->
 
-                <div class="welcome-icon">
-                    👋
+        <div class="welcome-banner">
+
+            <div class="welcome-icon">
+                👋
+            </div>
+
+            <div class="welcome-content">
+
+                <div class="welcome-title">
+                    Chào mừng đến với Wings Up!
                 </div>
 
-                <div class="welcome-content">
+                <div class="welcome-name">
+                    ${esc(welcomeName)}
+                </div>
 
-                    <div class="welcome-title">
-                        Chào mừng trở lại!
-                    </div>
-
-                    <div class="welcome-name">
-                        ${esc(welcomeName)}
-                    </div>
-
-                    <div class="welcome-subtitle">
-                        Chúc bạn một ngày làm việc hiệu quả với Wings Up.
-                    </div>
-
+                <div class="welcome-subtitle">
+                    Chúc bạn một ngày làm việc hiệu quả với Wings Up.
                 </div>
 
             </div>
 
-
-            <h1>
-                Trang Chủ Kho
-            </h1>
+        </div>
 
 
-            <div class="grid">
+        <!-- ================= TRANG CHỦ ================= -->
 
-                <div class="stat">
-
-                    <span>
-                        Số loại sản phẩm
-                    </span>
-
-                    <strong>
-                        ${d.totalProducts}
-                    </strong>
-
-                </div>
+        <h1>
+            Trang Chủ Kho
+        </h1>
 
 
-                <div class="stat">
+        <!-- ================= THỐNG KÊ ================= -->
 
-                    <span>
-                        Tổng số lượng tồn
-                    </span>
+        <div class="grid">
 
-                    <strong>
-                        ${d.totalQuantity}
-                    </strong>
+            <div class="stat">
 
-                </div>
+                <span>
+                    Số loại sản phẩm
+                </span>
 
-
-                <div
-                    class="stat ${d.lowStockCount ? 'alert' : ''}"
-                >
-
-                    <span>
-                        Sắp hết hàng
-                    </span>
-
-                    <strong>
-                        ${d.lowStockCount}
-                    </strong>
-
-                </div>
-
-
-                <div class="stat">
-
-                    <span>
-
-                        ${
-                            canViewAllTransactions
-                            ? 'Phiếu chờ duyệt'
-                            : 'Phiếu của tôi đang chờ'
-                        }
-
-                    </span>
-
-                    <strong>
-                        ${d.pendingCount}
-                    </strong>
-
-                </div>
+                <strong>
+                    ${d.totalProducts}
+                </strong>
 
             </div>
 
 
-            <div class="panel">
+            <div class="stat">
 
-                <h2>
-                    Sản phẩm dưới mức tồn tối thiểu
-                </h2>
+                <span>
+                    Tổng số lượng tồn
+                </span>
 
+                <strong>
+                    ${d.totalQuantity}
+                </strong>
 
-                ${
-                    d.lowStock.length
-
-                    ? `
-
-                        <div class="table-wrap">
-
-                            <table>
-
-                                <thead>
-
-                                    <tr>
-
-                                        <th>ID</th>
-
-                                        <th>
-                                            Tên
-                                        </th>
-
-                                        <th class="num">
-                                            Tồn Kho
-                                        </th>
-
-                                        <th class="num">
-                                            Tối thiểu
-                                        </th>
-
-                                    </tr>
-
-                                </thead>
+            </div>
 
 
-                                <tbody>
+            <div
+                class="stat ${d.lowStockCount ? 'alert' : ''}"
+            >
 
-                                    ${d.lowStock.map(p => `
+                <span>
+                    Sắp hết hàng
+                </span>
+
+                <strong>
+                    ${d.lowStockCount}
+                </strong>
+
+            </div>
+
+
+            <div class="stat">
+
+                <span>
+                    ${
+                    canViewAllTransactions
+                    ? 'Phiếu chờ duyệt'
+                    : 'Phiếu của tôi đang chờ'
+                    }
+                </span>
+
+                <strong>
+                    ${d.pendingCount}
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <!-- ================= TỒN KHO THẤP ================= -->
+
+        <div class="panel">
+
+            <h2>
+                Sản phẩm dưới mức tồn tối thiểu
+            </h2>
+
+
+            ${
+            d.lowStock.length
+
+            ? `
+
+                    <div class="table-wrap">
+
+                        <table>
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>
+                                        ID
+                                    </th>
+
+                                    <th>
+                                        Tên
+                                    </th>
+
+                                    <th class="num">
+                                        Tồn Kho
+                                    </th>
+
+                                    <th class="num">
+                                        Tối thiểu
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody>
+
+                                ${
+                d.lowStock
+                .map(p => `
 
                                         <tr>
 
@@ -1494,82 +1567,88 @@ async function pageDashboard() {
 
                                         </tr>
 
-                                    `).join('')}
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-
-                    `
-
-                    : `
-
-                        <div class="empty">
-                            Không có sản phẩm nào dưới mức tối thiểu.
-                        </div>
-
-                    `
+                                    `)
+                .join('')
                 }
 
-            </div>
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                `
+
+            : `
+
+                    <div class="empty">
+                        Không có sản phẩm nào dưới mức tối thiểu.
+                    </div>
+
+                `
+            }
+
+        </div>
 
 
-            <div class="panel">
+        <!-- ================= PHIẾU GẦN ĐÂY ================= -->
 
-                <h2>
+        <div class="panel">
 
-                    ${
-                        canViewAllTransactions
-                        ? 'Phiếu gần đây'
-                        : 'Phiếu gần đây của tôi'
-                    }
-
-                </h2>
-
+            <h2>
 
                 ${
-                    d.recent.length
+                canViewAllTransactions
+                ? 'Phiếu gần đây'
+                : 'Phiếu gần đây của tôi'
+                }
 
-                    ? `
-
-                        <div class="table-wrap">
-
-                            <table>
-
-                                <thead>
-
-                                    <tr>
-
-                                        <th>
-                                            Thời gian
-                                        </th>
-
-                                        <th>
-                                            Loại
-                                        </th>
-
-                                        <th>
-                                            Sản phẩm
-                                        </th>
-
-                                        <th class="num">
-                                            SL
-                                        </th>
-
-                                        <th>
-                                            Trạng thái
-                                        </th>
-
-                                    </tr>
-
-                                </thead>
+            </h2>
 
 
-                                <tbody>
+            ${
+            d.recent.length
 
-                                    ${d.recent.map(t => `
+            ? `
+
+                    <div class="table-wrap">
+
+                        <table>
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>
+                                        Thời gian
+                                    </th>
+
+                                    <th>
+                                        Loại
+                                    </th>
+
+                                    <th>
+                                        Sản phẩm
+                                    </th>
+
+                                    <th class="num">
+                                        SL
+                                    </th>
+
+                                    <th>
+                                        Trạng thái
+                                    </th>
+
+                                </tr>
+
+                            </thead>
+
+
+                            <tbody>
+
+                                ${
+                d.recent
+                .map(t => `
 
                                         <tr>
 
@@ -1585,10 +1664,10 @@ async function pageDashboard() {
                                                 >
 
                                                     ${
-                                                        t.type === 'IN'
-                                                        ? 'Nhập'
-                                                        : 'Xuất'
-                                                    }
+                            t.type === 'IN'
+                            ? 'Nhập'
+                            : 'Xuất'
+                            }
 
                                                 </span>
 
@@ -1598,9 +1677,9 @@ async function pageDashboard() {
                                             <td>
 
                                                 ${esc(
-                                                    t.product?.name ||
-                                                    'Sản phẩm đã xóa'
-                                                )}
+                                    t.product?.name ||
+                                    'Sản phẩm đã xóa'
+                                    )}
 
                                             </td>
 
@@ -1617,9 +1696,9 @@ async function pageDashboard() {
                                                 >
 
                                                     ${
-                                                        STATUS[t.status] ||
-                                                        t.status
-                                                    }
+                            STATUS[t.status] ||
+                            t.status
+                            }
 
                                                 </span>
 
@@ -1627,28 +1706,30 @@ async function pageDashboard() {
 
                                         </tr>
 
-                                    `).join('')}
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-
-                    `
-
-                    : `
-
-                        <div class="empty">
-                            Chưa có phiếu nào.
-                        </div>
-
-                    `
+                                    `)
+                .join('')
                 }
 
-            </div>
+                            </tbody>
 
-        `);
+                        </table>
+
+                    </div>
+
+                `
+
+            : `
+
+                    <div class="empty">
+                        Chưa có phiếu nào.
+                    </div>
+
+                `
+            }
+
+        </div>
+
+    `);
 
     } catch (e) {
 
@@ -1665,7 +1746,6 @@ async function pageDashboard() {
     }
 
 }
-
 
 /* ================= Sản phẩm ================= */
 
@@ -4071,8 +4151,10 @@ async function pageLectures() {
         items: [],
         form: null,
         editing: null,
-        error: ''
+        error: '',
+        search: ''
     };
+
     await lectureLoad();
 }
 
@@ -4572,6 +4654,1058 @@ function lectureSearch() {
     lectureDraw();
 }
 
+/* =========================================================
+ YÊU CẦU ĐẶC BIỆT - CHAT
+ ========================================================= */
+
+let specialRequests = {
+    items: [],
+    activeId: null,
+    messages: [],
+    loading: false,
+    error: '',
+    subject: '',
+    message: ''
+};
+
+let specialRequestTimer = null;
+
+
+/* ================= Load danh sách yêu cầu ================= */
+
+async function specialRequestLoad() {
+
+    try {
+
+        specialRequests.items =
+                await api('/special-requests');
+
+        specialRequests.error = '';
+
+    } catch (e) {
+
+        specialRequests.error = e.message;
+    }
+
+    specialRequestDraw();
+}
+
+
+/* ================= Mở yêu cầu ================= */
+
+async function openSpecialRequest(id) {
+
+    specialRequests.activeId = id;
+    specialRequests.messages = [];
+
+    await specialRequestLoadMessages(id);
+
+    await api(
+            '/special-requests/' +
+            id +
+            '/read',
+            'POST'
+            ).catch(() => {
+    });
+
+    specialRequestDraw();
+}
+
+
+/* ================= Load tin nhắn ================= */
+
+async function specialRequestLoadMessages(
+        id,
+        redraw = false
+        ) {
+
+    try {
+
+        specialRequests.messages =
+                await api(
+                        '/special-requests/' +
+                        id +
+                        '/messages'
+                        );
+
+        if (redraw) {
+            specialRequestDraw();
+        }
+
+    } catch (e) {
+
+        specialRequests.error =
+                e.message;
+
+        if (redraw) {
+            specialRequestDraw();
+        }
+}
+}
+
+
+/* ================= Tạo yêu cầu mới ================= */
+
+async function createSpecialRequest() {
+
+    const subject =
+            document
+            .getElementById('special_subject')
+            ?.value
+            .trim();
+
+    const message =
+            document
+            .getElementById('special_message')
+            ?.value
+            .trim();
+
+    if (!subject) {
+
+        alert(
+                'Vui lòng nhập tiêu đề yêu cầu.'
+                );
+
+        return;
+    }
+
+    if (!message) {
+
+        alert(
+                'Vui lòng nhập nội dung yêu cầu.'
+                );
+
+        return;
+    }
+
+    try {
+
+        const saved =
+                await api(
+                        '/special-requests',
+                        'POST',
+                        {
+                            subject: subject,
+                            message: message
+                        }
+                );
+
+        specialRequests.activeId =
+                saved.id;
+
+        specialRequests.subject = '';
+        specialRequests.message = '';
+
+        await specialRequestLoadMessages(
+                saved.id
+                );
+
+        await specialRequestLoad();
+
+        alert(
+                '✅ Đã gửi yêu cầu đến quản lý kho.'
+                );
+
+    } catch (e) {
+
+        alert(
+                '❌ ' + e.message
+                );
+    }
+}
+
+
+/* ================= Gửi tin nhắn ================= */
+
+async function sendSpecialMessage() {
+
+    if (!specialRequests.activeId) {
+        return;
+    }
+
+    const input =
+            document.getElementById(
+                    'special_chat_input'
+                    );
+
+    if (!input) {
+        return;
+    }
+
+    const message =
+            input.value.trim();
+
+    if (!message) {
+        return;
+    }
+
+    input.disabled = true;
+
+    try {
+
+        await api(
+                '/special-requests/' +
+                specialRequests.activeId +
+                '/messages',
+                'POST',
+                {
+                    message: message
+                }
+        );
+
+        input.value = '';
+
+        await specialRequestLoadMessages(
+                specialRequests.activeId
+                );
+
+        await api(
+                '/special-requests/' +
+                specialRequests.activeId +
+                '/read',
+                'POST'
+                ).catch(() => {
+        });
+
+        specialRequestDraw();
+
+    } catch (e) {
+
+        alert(
+                '❌ ' + e.message
+                );
+
+    } finally {
+
+        input.disabled = false;
+        input.focus();
+    }
+}
+
+
+/* ================= Đóng yêu cầu ================= */
+
+async function closeSpecialRequest(id) {
+
+    if (
+            !confirm(
+                    'Bạn có chắc muốn đóng yêu cầu này?'
+                    )
+            ) {
+
+        return;
+    }
+
+    try {
+
+        await api(
+                '/special-requests/' +
+                id +
+                '/close',
+                'POST'
+                );
+
+        await specialRequestLoadMessages(id);
+
+        await specialRequestLoad();
+
+    } catch (e) {
+
+        alert(
+                '❌ ' + e.message
+                );
+    }
+}
+
+async function deleteSpecialRequest(id) {
+
+    const request =
+            specialRequests.items.find(
+                    x => Number(x.id) === Number(id)
+            );
+
+    const subject =
+            request?.subject ||
+            'cuộc trò chuyện này';
+
+    const ok = confirm(
+            `Bạn có chắc muốn xóa "${subject}"?\n\n` +
+            `Toàn bộ tin nhắn trong cuộc trò chuyện sẽ bị xóa và không thể khôi phục.`
+            );
+
+    if (!ok) {
+        return;
+    }
+
+    try {
+
+        // api(path, method, body)
+        await api(
+                `/special-requests/${id}`,
+                'DELETE'
+                );
+
+        // Xóa khỏi danh sách hiện tại
+        specialRequests.items =
+                specialRequests.items.filter(
+                        x => Number(x.id) !== Number(id)
+                );
+
+        // Nếu đang mở cuộc trò chuyện vừa xóa
+        if (
+                Number(specialRequests.activeId) === Number(id)
+                ) {
+            specialRequests.activeId = null;
+            specialRequests.messages = [];
+        }
+
+        specialRequests.error = '';
+
+        specialRequestDraw();
+
+    } catch (e) {
+
+        console.error(
+                'Delete special request:',
+                e
+                );
+
+        specialRequests.error =
+                e.message ||
+                'Không thể xóa cuộc trò chuyện';
+
+        specialRequestDraw();
+    }
+}
+
+
+/* ================= Bắt phím Enter ================= */
+
+function specialChatKeydown(e) {
+
+    if (
+            e.key === 'Enter' &&
+            !e.shiftKey
+            ) {
+
+        e.preventDefault();
+
+        sendSpecialMessage();
+    }
+}
+
+
+/* ================= Render trang ================= */
+
+async function pageSpecialRequests() {
+
+    specialRequests = {
+        items: [],
+        activeId: null,
+        messages: [],
+        loading: false,
+        error: '',
+        subject: '',
+        message: '',
+        searchName: ''
+    };
+
+    await specialRequestLoad();
+
+    specialRequestStartPolling();
+}
+
+
+/* ================= Polling ================= */
+
+function specialRequestStartPolling() {
+
+    specialRequestStopPolling();
+
+    specialRequestTimer =
+            setInterval(async () => {
+
+                if (
+                        !token ||
+                        location.hash !==
+                        '#/special-requests'
+                        ) {
+
+                    return;
+                }
+
+                try {
+
+                    const list =
+                            await api(
+                                    '/special-requests'
+                                    );
+
+                    specialRequests.items =
+                            list;
+
+                    if (
+                            specialRequests.activeId
+                            ) {
+
+                        await specialRequestLoadMessages(
+                                specialRequests.activeId
+                                );
+
+                        const box =
+                                document.getElementById(
+                                        'special-chat-messages'
+                                        );
+
+                        if (box) {
+
+                            box.innerHTML =
+                                    specialRequestMessagesHtml();
+
+                            box.scrollTop =
+                                    box.scrollHeight;
+                        }
+                    }
+
+                    specialRequestUpdateList();
+
+                } catch (e) {
+
+                    console.error(
+                            'Special request polling:',
+                            e
+                            );
+                }
+
+            }, 3000);
+}
+
+
+function specialRequestStopPolling() {
+
+    if (specialRequestTimer) {
+
+        clearInterval(
+                specialRequestTimer
+                );
+
+        specialRequestTimer = null;
+    }
+}
+
+
+/* ================= Danh sách bên trái ================= */
+
+function specialRequestListHtml() {
+
+    if (
+            !specialRequests.items ||
+            specialRequests.items.length === 0
+            ) {
+
+        return `
+            <div class="special-empty">
+                💬 Chưa có yêu cầu nào.
+            </div>
+        `;
+    }
+
+    const keyword =
+            String(
+                    specialRequests.searchName || ''
+                    )
+            .trim()
+            .toLowerCase();
+
+    const filtered =
+            specialRequests.items.filter(request => {
+
+                const owner =
+                        request.user?.fullName ||
+                        request.user?.username ||
+                        'Người dùng';
+
+                return owner
+                        .toLowerCase()
+                        .includes(keyword);
+            });
+
+    if (filtered.length === 0) {
+
+        return `
+            <div class="special-empty">
+                🔎 Không tìm thấy yêu cầu
+            </div>
+        `;
+    }
+
+    return filtered
+            .map(request => {
+
+                const owner =
+                        request.user?.fullName ||
+                        request.user?.username ||
+                        'Người dùng';
+
+                const active =
+                        Number(
+                                specialRequests.activeId
+                                ) === Number(request.id);
+
+                const statusText =
+                        request.status === 'CLOSED'
+                        ? 'Đã đóng'
+                        : 'Đang mở';
+
+                return `
+
+                <button
+                    type="button"
+                    class="
+                        special-request-item
+                        ${active ? 'active' : ''}
+                    "
+                    onclick="
+                        openSpecialRequest(
+                            ${request.id}
+                        )
+                    "
+                >
+
+                    <div
+                        class="special-request-top"
+                    >
+
+                        <strong>
+                            ${esc(request.subject)}
+                        </strong>
+
+                        <span
+                            class="
+                                special-status
+                                ${request.status}
+                            "
+                        >
+                            ${statusText}
+                        </span>
+
+                    </div>
+
+                    <div
+                        class="special-request-user"
+                    >
+                        👤 ${esc(owner)}
+                    </div>
+
+                    <div
+                        class="special-request-time"
+                    >
+                        ${dt(request.updatedAt)}
+                    </div>
+
+                </button>
+
+            `;
+
+            })
+            .join('');
+}
+
+
+/* ================= Tin nhắn ================= */
+
+function specialRequestMessagesHtml() {
+
+    if (
+            !specialRequests.messages ||
+            specialRequests.messages.length === 0
+            ) {
+
+        return `
+
+            <div class="special-chat-empty">
+
+                Chưa có tin nhắn.
+
+            </div>
+
+        `;
+    }
+
+    return specialRequests.messages
+            .map(message => {
+
+                const mine =
+                        message.sender?.id ===
+                        user?.id;
+
+                const senderName =
+                        message.sender?.fullName ||
+                        message.sender?.username ||
+                        'Người dùng';
+
+                return `
+
+            <div
+                class="
+                    special-message
+                    ${mine ? 'mine' : 'other'}
+                "
+            >
+
+                <div
+                    class="special-message-name"
+                >
+                    ${mine
+                        ? 'Bạn'
+                        : esc(senderName)}
+                </div>
+
+
+                <div
+                    class="special-message-bubble"
+                >
+                    ${esc(message.message)}
+                </div>
+
+
+                <div
+                    class="special-message-time"
+                >
+                    ${dt(message.createdAt)}
+                </div>
+
+            </div>
+
+        `;
+
+            }).join('');
+}
+
+
+/* ================= Cập nhật danh sách ================= */
+
+function specialRequestUpdateList() {
+
+    const list =
+            document.getElementById(
+                    'special-request-list'
+                    );
+
+    if (list) {
+
+        list.innerHTML =
+                specialRequestListHtml();
+    }
+}
+
+function specialRequestSearchName(value) {
+
+    specialRequests.searchName =
+            value || '';
+
+    specialRequestUpdateList();
+}
+
+/* ================= Vẽ trang ================= */
+
+function specialRequestDraw() {
+
+    const active =
+            specialRequests.items.find(
+                    x =>
+                Number(x.id) ===
+                        Number(
+                                specialRequests.activeId
+                                )
+            );
+
+    const isManagerUser =
+            isAdmin() ||
+            isManager();
+
+    draw(`
+
+        <div class="special-page">
+
+            <div class="special-header">
+
+                <div>
+
+                    <h1>
+                        💬 Yêu cầu đặc biệt
+                    </h1>
+
+                    <p>
+                        Trao đổi trực tiếp với quản lý kho.
+                    </p>
+
+                </div>
+
+
+                ${
+            !isManagerUser
+
+            ? `
+
+                        <button
+                            class="btn"
+                            onclick="
+                                specialRequestNew()
+                            "
+                        >
+                            + Yêu cầu mới
+                        </button>
+
+                    `
+
+            : ''
+            }
+
+            </div>
+
+
+            ${err(specialRequests.error)}
+
+
+            <div class="special-chat-layout">
+
+
+                <!-- ================= DANH SÁCH ================= -->
+
+                <div
+                    class="special-request-panel"
+                >
+
+                    <div class="special-panel-title">
+
+    ${
+            isManagerUser
+            ? '📥 Tất cả yêu cầu'
+            : '📨 Yêu cầu của tôi'
+            }
+
+</div>
+
+
+${
+            isManagerUser
+            ? `
+        <div class="special-search-box">
+
+            <input
+                id="special-search-name"
+                type="text"
+                placeholder="🔎 Tìm theo tên người gửi..."
+                value="${esc(
+                    specialRequests.searchName || ''
+                    )}"
+                oninput="
+                    specialRequestSearchName(this.value)
+                "
+            >
+
+        </div>
+    `
+            : ''
+            }
+
+
+<div
+    id="special-request-list"
+    class="special-request-list"
+>
+
+                        ${specialRequestListHtml()}
+
+                    </div>
+
+                </div>
+
+
+                <!-- ================= CHAT ================= -->
+
+                <div
+                    class="special-chat-panel"
+                >
+
+                    ${
+            active
+
+            ? `
+
+                            <div
+                                class="special-chat-header"
+                            >
+
+                                <div>
+
+                                    <strong>
+                                        ${esc(
+                    active.subject
+                    )}
+                                    </strong>
+
+                                    <small>
+
+                                        👤 ${
+            esc(
+                    active.user?.fullName ||
+                    active.user?.username ||
+                    'Người dùng'
+                    )
+            }
+
+                                    </small>
+
+                                </div>
+
+
+                                ${
+            isManagerUser
+            ? `
+        <div class="special-chat-actions">
+
+            ${
+            active.status !== 'CLOSED'
+            ? `
+                    <button
+                        class="
+                            btn
+                            danger
+                            small
+                        "
+                        onclick="
+                            closeSpecialRequest(
+                                ${active.id}
+                            )
+                        "
+                    >
+                        Đóng yêu cầu
+                    </button>
+                `
+            : ''
+            }
+
+            <button
+                class="
+                    btn
+                    danger
+                    small
+                "
+                onclick="
+                    deleteSpecialRequest(
+                        ${active.id}
+                    )
+                "
+            >
+                🗑️ Xóa chat
+            </button>
+
+        </div>
+    `
+            : ''
+            }
+
+                            </div>
+
+
+                            <div
+                                id="special-chat-messages"
+                                class="special-chat-messages"
+                            >
+
+                                ${specialRequestMessagesHtml()}
+
+                            </div>
+
+
+                            ${
+            active.status === 'CLOSED'
+
+            ? `
+
+                                    <div
+                                        class="special-chat-closed"
+                                    >
+                                        🔒 Yêu cầu này đã được đóng.
+                                    </div>
+
+                                `
+
+            : `
+
+                                    <div
+                                        class="special-chat-input"
+                                    >
+
+                                        <textarea
+                                            id="special_chat_input"
+                                            rows="2"
+                                            placeholder="Nhập tin nhắn..."
+                                            onkeydown="
+                                                specialChatKeydown(event)
+                                            "
+                                        ></textarea>
+
+
+                                        <button
+                                            class="btn"
+                                            onclick="
+                                                sendSpecialMessage()
+                                            "
+                                        >
+                                            Gửi
+                                        </button>
+
+                                    </div>
+
+                                `
+            }
+
+                        `
+
+            : `
+
+                            <div
+                                class="special-chat-placeholder"
+                            >
+
+                                <div>
+                                    💬
+                                </div>
+
+                                <h2>
+                                    Chọn một yêu cầu
+                                </h2>
+
+                                <p>
+                                    Chọn yêu cầu bên trái để bắt đầu trò chuyện.
+                                </p>
+
+                            </div>
+
+                        `
+            }
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `);
+
+    const box =
+            document.getElementById(
+                    'special-chat-messages'
+                    );
+
+    if (box) {
+
+        box.scrollTop =
+                box.scrollHeight;
+    }
+}
+
+
+/* ================= Tạo yêu cầu mới ================= */
+
+function specialRequestNew() {
+
+    specialRequests.activeId = null;
+    specialRequests.messages = [];
+
+    draw(`
+
+        <div class="special-page">
+
+            <div class="special-header">
+
+                <div>
+
+                    <h1>
+                        💬 Yêu cầu đặc biệt
+                    </h1>
+
+                    <p>
+                        Gửi yêu cầu đến ADMIN hoặc MANAGER.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="panel special-new-panel">
+
+                <h2>
+                    📝 Tạo yêu cầu mới
+                </h2>
+
+
+                <div class="form">
+
+                    <label>
+
+                        Tiêu đề yêu cầu
+
+                        <input
+                            id="special_subject"
+                            placeholder="VD: Xin cấp thêm thiết bị"
+                        >
+
+                    </label>
+
+
+                    <label>
+
+                        Nội dung
+
+                        <textarea
+                            id="special_message"
+                            rows="7"
+                            placeholder="Nhập nội dung yêu cầu..."
+                        ></textarea>
+
+                    </label>
+
+                </div>
+
+
+                <div
+                    class="actions"
+                    style="margin-top:15px"
+                >
+
+                    <button
+                        class="btn"
+                        onclick="
+                            createSpecialRequest()
+                        "
+                    >
+                        📤 Gửi yêu cầu
+                    </button>
+
+
+                    <button
+                        class="btn ghost"
+                        onclick="
+                            pageSpecialRequests()
+                        "
+                    >
+                        Hủy
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `);
+}
+
 
 /* ================= Tài khoản ================= */
 
@@ -4818,6 +5952,18 @@ async function changePassword() {
 
 window.addEventListener(
         'hashchange',
-        render
-        );
+        () => {
+
+    if (
+            location.hash !==
+            '#/special-requests'
+            ) {
+
+        specialRequestStopPolling();
+    }
+
+    render();
+}
+);
+
 render();
