@@ -10,44 +10,34 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
 const dt = (s) => (s ? new Date(s).toLocaleString('vi-VN') : '');
 const err = (m) => (m ? `<div class="msg error">${esc(m)}</div>` : '');
 const okMsg = (m) => (m ? `<div class="msg success">${esc(m)}</div>` : '');
-
 const draw = (html) => {
     const el = document.getElementById('content');
-
     if (el) {
         el.innerHTML = html;
     }
 };
-
 const val = (id) => {
     const el = document.getElementById(id);
-
     if (!el) {
         throw new Error('Không tìm thấy ô nhập có id: ' + id);
     }
 
     return el.value;
 };
-
 const STATUS = {
     PENDING: 'Chờ duyệt',
     APPROVED: 'Đã duyệt',
     REJECTED: 'Từ chối'
 };
-
 let token = localStorage.getItem('token');
 let user = JSON.parse(localStorage.getItem('user') || 'null');
-
 const isAdmin = () => !!user && user.role === 'ADMIN';
 const isManager = () => !!user && user.role === 'MANAGER';
-
 const canManageWarehouse = () =>
     isAdmin() || isManager();
-
 function setSession(t, u) {
     token = t;
     user = u;
-
     localStorage.setItem('token', t);
     localStorage.setItem('user', JSON.stringify(u));
 }
@@ -55,7 +45,6 @@ function setSession(t, u) {
 function clearSession() {
     token = null;
     user = null;
-
     localStorage.removeItem('token');
     localStorage.removeItem('user');
 }
@@ -68,7 +57,6 @@ async function api(path, method = 'GET', body) {
     const headers = {
         'Content-Type': 'application/json'
     };
-
     if (token) {
         headers.Authorization = 'Bearer ' + token;
     }
@@ -80,11 +68,8 @@ async function api(path, method = 'GET', body) {
                 ? JSON.stringify(body)
                 : undefined
     });
-
     const text = await res.text();
-
     let data = null;
-
     try {
         data = text ? JSON.parse(text) : null;
     } catch (e) {
@@ -94,11 +79,8 @@ async function api(path, method = 'GET', body) {
     if (res.status === 401 && path !== '/auth/login') {
 
         clearSession();
-
         location.hash = '#/login';
-
         render();
-
         throw new Error('Phiên đăng nhập đã hết hạn');
     }
 
@@ -122,14 +104,12 @@ async function loadNotifications() {
 
     try {
         return await api('/notifications');
-
     } catch (e) {
 
         console.error(
                 'Không tải được thông báo:',
                 e
                 );
-
         return [];
     }
 }
@@ -141,16 +121,13 @@ async function loadUnreadCount() {
 
         const data =
                 await api('/notifications/unread-count');
-
         return data.count || 0;
-
     } catch (e) {
 
         console.error(
                 'Không tải được số thông báo:',
                 e
                 );
-
         return 0;
     }
 }
@@ -160,22 +137,18 @@ async function updateNotificationBadge() {
 
     const badge =
             document.getElementById('notificationBadge');
-
     if (!badge) {
         return;
     }
 
     const count =
             await loadUnreadCount();
-
     if (count > 0) {
 
         badge.textContent = `(${count})`;
-
         badge.style.color = 'red';
         badge.style.fontWeight = 'bold';
         badge.style.marginLeft = '5px';
-
     } else {
 
         badge.textContent = '';
@@ -189,16 +162,13 @@ function showNotificationPopup(title, message) {
 
     const old =
             document.getElementById('notificationPopup');
-
     if (old) {
         old.remove();
     }
 
     const div =
             document.createElement('div');
-
     div.id = 'notificationPopup';
-
     div.innerHTML = `
         <div style="
             position:fixed;
@@ -247,9 +217,7 @@ function showNotificationPopup(title, message) {
 
         </div>
     `;
-
     document.body.appendChild(div);
-
     setTimeout(() => {
 
         if (div) {
@@ -263,7 +231,6 @@ function showNotificationPopup(title, message) {
 /* ================= Kiểm tra thông báo mới ================= */
 
 let knownNotificationIds = new Set();
-
 async function checkNewNotifications() {
 
     if (!token || !user) {
@@ -274,7 +241,6 @@ async function checkNewNotifications() {
 
         const list =
                 await api('/notifications');
-
         if (!list || list.length === 0) {
             return;
         }
@@ -293,20 +259,16 @@ async function checkNewNotifications() {
             list.forEach(n => {
                 knownNotificationIds.add(n.id);
             });
-
             const unread =
                     list.filter(n => !n.read);
-
             if (unread.length > 0) {
 
                 const newest =
                         unread[0];
-
                 showNotificationPopup(
                         newest.title,
                         newest.message
                         );
-
                 await updateNotificationBadge();
             }
 
@@ -329,7 +291,6 @@ async function checkNewNotifications() {
                             n.title,
                             n.message
                             );
-
                     await updateNotificationBadge();
                 }
             }
@@ -352,15 +313,11 @@ async function checkNewNotifications() {
 setInterval(() => {
     checkNewNotifications();
 }, 3000);
-
-
 /*
  * Chạy ngay lần đầu.
  */
 
 checkNewNotifications();
-
-
 /*
  * Cập nhật số thông báo chưa đọc
  * mỗi 3 giây.
@@ -369,8 +326,6 @@ checkNewNotifications();
 setInterval(() => {
     updateNotificationBadge();
 }, 3000);
-
-
 /* ================= Heartbeat ================= */
 
 setInterval(async () => {
@@ -385,7 +340,6 @@ setInterval(async () => {
                 '/auth/heartbeat',
                 'POST'
                 );
-
     } catch (e) {
 
         console.error(
@@ -395,8 +349,6 @@ setInterval(async () => {
     }
 
 }, 30000);
-
-
 /* ================= Khung trang & điều hướng ================= */
 
 function layout() {
@@ -407,8 +359,6 @@ function layout() {
         ['#/transactions', '🧾 Phiếu nhập/xuất'],
         ['#/lectures', '📚 Bài giảng']
     ];
-
-
     /* ADMIN và MANAGER được dùng Danh mục */
 
     if (
@@ -434,8 +384,6 @@ function layout() {
 
     const here =
             location.hash || '#/';
-
-
     document.getElementById('app').innerHTML = `
 
         <header class="topbar">
@@ -475,19 +423,60 @@ function layout() {
     ).join('')}
 
 
-                <!-- THÔNG BÁO TRONG MENU 3 GẠCH -->
+<!-- THÔNG BÁO TRONG MENU 3 GẠCH -->
 
-                <a
-                    href="#/notifications"
-                    class="mobile-notification"
-                    onclick="closeMobileMenu()"
-                >
-                    🔔 Thông báo
+<a
+    href="#/notifications"
+    class="mobile-notification"
+    onclick="closeMobileMenu()"
+>
+    🔔 Thông báo
+    <span id="notificationBadgeMobile"></span>
+</a>
 
-                    <span id="notificationBadgeMobile"></span>
-                </a>
+<!-- TÀI KHOẢN + ĐĂNG XUẤT TRONG MENU 3 GẠCH -->
 
-            </nav>
+<div class="mobile-account">
+
+    <a
+        href="#/profile"
+        class="mobile-user-info"
+        onclick="closeMobileMenu()"
+    >
+        <span class="mobile-user-name">
+            ${esc(
+            user?.fullName ||
+            user?.username ||
+            'Người dùng'
+            )}
+        </span>
+
+        <span class="mobile-user-role">
+            ${
+            user?.role === 'ADMIN'
+            ? 'Quản trị viên Wings Up'
+            : user?.role === 'MANAGER'
+            ? 'Quản lý Wings Up'
+            : 'Người dùng Wings Up'
+            }
+        </span>
+    </a>
+
+    <a
+        href="#"
+        class="mobile-logout"
+        onclick="
+            closeMobileMenu();
+            logout();
+            return false;
+        "
+    >
+        🚪 Đăng xuất
+    </a>
+
+</div>
+
+</nav>
 
 
             <!-- ================= THÔNG BÁO PC ================= -->
@@ -513,54 +502,54 @@ function layout() {
 
                 <a
                     href="#/profile"
+                    class="user-info"
                     onclick="closeMobileMenu()"
                 >
+                    <span class="user-name">
+                        ${esc(
+                    user.fullName ||
+                    user.username ||
+                    'Người dùng'
+                    )}
+                    </span>
 
-                    ${esc(
-            user.fullName ||
-            user.username
-            )}
-
-                    (${esc(user.role)})
-
+                    <span class="user-role">
+                        ${
+            user.role === 'ADMIN'
+            ? 'Quản trị viên Wings Up'
+            : user.role === 'MANAGER'
+            ? 'Quản lý Wings Up'
+            : 'Người dùng Wings Up'
+            }
+                    </span>
                 </a>
-
 
                 <a
                     href="#"
+                    class="logout-link"
                     onclick="
                         closeMobileMenu();
                         logout();
                         return false;
                     "
                 >
-                    Đăng xuất
+                    🚪 Đăng xuất
                 </a>
 
             </div>
 
         </header>
 
-
         <main id="content"></main>
 
     `;
-
-
-    /*
-     * Cập nhật số thông báo
-     */
-
-    updateNotificationBadge();
 }
-
 /* ================= MENU MOBILE ================= */
 
 function toggleMobileMenu() {
 
     const nav =
             document.getElementById('mainNav');
-
     if (!nav) {
         return;
     }
@@ -575,7 +564,6 @@ function closeMobileMenu() {
 
     const nav =
             document.getElementById('mainNav');
-
     if (!nav) {
         return;
     }
@@ -596,8 +584,6 @@ async function render() {
     const route =
             (location.hash || '#/')
             .slice(2);
-
-
     /*
      * Chỉ ADMIN được vào trang Người dùng
      */
@@ -608,7 +594,6 @@ async function render() {
             ) {
 
         location.hash = '#/';
-
         return;
     }
 
@@ -623,14 +608,11 @@ async function render() {
             ) {
 
         location.hash = '#/';
-
         return;
     }
 
 
     layout();
-
-
     if (CRUD[route]) {
         return pageCrud(route);
     }
@@ -640,19 +622,14 @@ async function render() {
 
         case 'products':
             return pageProducts();
-
         case 'transactions':
             return pageTransactions();
-
         case 'lectures':
             return pageLectures();
-
         case 'notifications':
             return pageNotifications();
-
         case 'profile':
             return pageProfile();
-
         default:
             return pageDashboard();
     }
@@ -662,11 +639,9 @@ async function render() {
 /* ================= Đăng nhập / Đăng ký ================= */
 
 let registerMode = false;
-
 function pageLogin(msg = '') {
 
     registerMode = false;
-
     document.getElementById('app').innerHTML = `
 
         <div class="login-page">
@@ -754,7 +729,6 @@ function pageLogin(msg = '') {
 
         </div>
     `;
-
     document.getElementById('lp').addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -769,11 +743,9 @@ async function doLogin() {
 
     const username = document.getElementById('lu')?.value.trim();
     const password = document.getElementById('lp')?.value;
-
     console.log('===== LOGIN =====');
     console.log('Username:', username);
     console.log('Password:', password ? 'ĐÃ NHẬP' : 'TRỐNG');
-
     if (!username) {
         pageLogin('Vui lòng nhập tên đăng nhập!');
         return;
@@ -787,30 +759,23 @@ async function doLogin() {
     try {
 
         console.log('Đang gọi /auth/login...');
-
         const result = await api('/auth/login', 'POST', {
             username: username,
             password: password
         });
-
         console.log('LOGIN RESPONSE:', result);
-
         user = result.user || result;
-
         localStorage.setItem(
                 'user',
                 JSON.stringify(user)
                 );
-
         if (result.token) {
 
             token = result.token;
-
             localStorage.setItem(
                     'token',
                     result.token
                     );
-
         } else {
 
             pageLogin('Đăng nhập thất bại: không nhận được token.');
@@ -818,13 +783,10 @@ async function doLogin() {
         }
 
         location.hash = '#/';
-
         render();
-
     } catch (error) {
 
         console.error('LOGIN ERROR:', error);
-
         // HIỆN LỖI TRÊN GIAO DIỆN
         pageLogin(
                 error?.message || 'Tên đăng nhập hoặc mật khẩu không đúng!'
@@ -838,7 +800,6 @@ async function doLogin() {
 function showForgotPassword() {
 
     registerMode = false;
-
     document.getElementById('app').innerHTML = `
 
         <div class="login-page">
@@ -970,14 +931,12 @@ function showForgotPassword() {
 
 async function sendForgotCode() {
     const emailInput = document.getElementById("forgot_email");
-
     if (!emailInput) {
         alert("❌ Không tìm thấy ô nhập email!");
         return;
     }
 
     const email = emailInput.value.trim().toLowerCase();
-
     if (!email) {
         alert("⚠️ Vui lòng nhập email tài khoản!");
         emailInput.focus();
@@ -985,7 +944,6 @@ async function sendForgotCode() {
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
     if (!emailRegex.test(email)) {
         alert("⚠️ Email không đúng định dạng!");
         emailInput.focus();
@@ -995,7 +953,6 @@ async function sendForgotCode() {
     try {
         // Hiển thị đang gửi
         alert("⏳ Đang gửi mã OTP...");
-
         const result = await api(
                 "/auth/forgot-password",
                 "POST",
@@ -1003,12 +960,9 @@ async function sendForgotCode() {
                     email: email
                 }
         );
-
         console.log("Kết quả gửi OTP:", result);
-
         // Hiện form nhập OTP
         const resetForm = document.getElementById("resetForm");
-
         if (resetForm) {
             resetForm.style.display = "block";
         }
@@ -1018,10 +972,8 @@ async function sendForgotCode() {
                 "Vui lòng kiểm tra email:\n" +
                 email
                 );
-
     } catch (error) {
         console.error("LỖI GỬI OTP:", error);
-
         alert(
                 "❌ Không thể gửi mã OTP!\n\n" +
                 (error?.message || "Có lỗi xảy ra, vui lòng thử lại.")
@@ -1036,25 +988,18 @@ async function resetForgotPassword() {
 
     const email =
             val('forgot_email').trim();
-
     const code =
             val('forgot_code').trim();
-
     const password =
             val('forgot_new_password');
-
     const confirmPassword =
             val('forgot_confirm_password');
-
     const message =
             document.getElementById('forgotMessage');
-
-
     if (!email) {
 
         message.innerHTML =
                 err('Email không được để trống');
-
         return;
     }
 
@@ -1063,7 +1008,6 @@ async function resetForgotPassword() {
 
         message.innerHTML =
                 err('Mã OTP không được để trống');
-
         return;
     }
 
@@ -1072,7 +1016,6 @@ async function resetForgotPassword() {
 
         message.innerHTML =
                 err('Mã OTP phải gồm 6 chữ số');
-
         return;
     }
 
@@ -1081,7 +1024,6 @@ async function resetForgotPassword() {
 
         message.innerHTML =
                 err('Mật khẩu mới không được để trống');
-
         return;
     }
 
@@ -1090,7 +1032,6 @@ async function resetForgotPassword() {
 
         message.innerHTML =
                 err('Mật khẩu mới phải từ 6 ký tự');
-
         return;
     }
 
@@ -1099,7 +1040,6 @@ async function resetForgotPassword() {
 
         message.innerHTML =
                 err('Vui lòng nhập lại mật khẩu');
-
         return;
     }
 
@@ -1108,7 +1048,6 @@ async function resetForgotPassword() {
 
         message.innerHTML =
                 err('Mật khẩu nhập lại không khớp');
-
         return;
     }
 
@@ -1124,16 +1063,11 @@ async function resetForgotPassword() {
                     newPassword: password
                 }
         );
-
-
         alert(
                 '✅ Đặt lại mật khẩu thành công!\n' +
                 'Vui lòng đăng nhập lại.'
                 );
-
-
         pageLogin();
-
     } catch (e) {
 
         message.innerHTML =
@@ -1146,7 +1080,6 @@ async function resetForgotPassword() {
 function showRegister(msg = '') {
 
     registerMode = true;
-
     document.getElementById('app').innerHTML = `
 
     <div class="login-page">
@@ -1252,8 +1185,6 @@ function showRegister(msg = '') {
     </div>
 
     `;
-
-
     document
             .getElementById('rp')
             .addEventListener(
@@ -1269,95 +1200,24 @@ function showRegister(msg = '') {
 }
 
 
-async function doRegister() {
-
-    const username =
-            val('ru').trim();
-
-    const password =
-            val('rp');
-
-    const fullName =
-            val('rf').trim();
-
-    const email =
-            val('re').trim();
-
-
-    if (!username) {
-
-        showRegister(
-                'Tên đăng nhập không được để trống'
-                );
-
-        return;
-    }
-
-
-    if (
-            !password ||
-            password.length < 6
-            ) {
-
-        showRegister(
-                'Mật khẩu phải từ 6 ký tự'
-                );
-
-        return;
-    }
-
-
-    try {
-
-        await api(
-                '/auth/register',
-                'POST',
-                {
-                    username: username,
-                    password: password,
-                    fullName: fullName,
-                    email: email
-                }
-        );
-
-
-        pageLogin();
-
-        alert(
-                'Tạo tài khoản thành công! Vui lòng đăng nhập.'
-                );
-
-    } catch (e) {
-
-        showRegister(e.message);
-    }
-}
-
 
 async function doRegister() {
 
     const username =
             val('ru').trim();
-
     const password =
             val('rp');
-
     const confirmPassword =
             val('rcp');
-
     const fullName =
             val('rf').trim();
-
     const email =
             val('re').trim();
-
-
     if (!username) {
 
         showRegister(
                 'Tên đăng nhập không được để trống'
                 );
-
         return;
     }
 
@@ -1370,7 +1230,6 @@ async function doRegister() {
         showRegister(
                 'Mật khẩu phải từ 6 ký tự'
                 );
-
         return;
     }
 
@@ -1381,7 +1240,6 @@ async function doRegister() {
         showRegister(
                 'Vui lòng xác nhận mật khẩu'
                 );
-
         return;
     }
 
@@ -1391,7 +1249,6 @@ async function doRegister() {
         showRegister(
                 'Mật khẩu xác nhận không khớp'
                 );
-
         return;
     }
 
@@ -1408,14 +1265,10 @@ async function doRegister() {
                     email: email
                 }
         );
-
-
         pageLogin();
-
         alert(
                 'Tạo tài khoản thành công! Vui lòng đăng nhập.'
                 );
-
     } catch (e) {
 
         showRegister(e.message);
@@ -1430,14 +1283,8 @@ async function doRegister() {
 
 knownNotificationIds =
         new Set();
-
-
 location.hash = '#/';
-
 render();
-
-
-
 async function logout() {
 
     try {
@@ -1446,7 +1293,6 @@ async function logout() {
                 '/auth/logout',
                 'POST'
                 );
-
     } catch (e) {
 
         console.log(
@@ -1457,14 +1303,10 @@ async function logout() {
 
 
     clearSession();
-
     knownNotificationIds =
             new Set();
-
-
     location.hash =
             '#/login';
-
     render();
 }
 
@@ -1475,11 +1317,50 @@ async function pageDashboard() {
 
     try {
 
-        const d =
-                await api('/dashboard');
+        const d = await api('/dashboard');
 
+        const welcomeName =
+                user?.fullName ||
+                user?.username ||
+                'bạn';
+
+        /*
+         * ADMIN + MANAGER:
+         * → xem phiếu của tất cả mọi người
+         *
+         * USER:
+         * → chỉ xem phiếu của mình
+         */
+        const canViewAllTransactions =
+                isAdmin() ||
+                isManager();
 
         draw(`
+
+            <div class="welcome-banner">
+
+                <div class="welcome-icon">
+                    👋
+                </div>
+
+                <div class="welcome-content">
+
+                    <div class="welcome-title">
+                        Chào mừng trở lại!
+                    </div>
+
+                    <div class="welcome-name">
+                        ${esc(welcomeName)}
+                    </div>
+
+                    <div class="welcome-subtitle">
+                        Chúc bạn một ngày làm việc hiệu quả với Wings Up.
+                    </div>
+
+                </div>
+
+            </div>
+
 
             <h1>
                 Trang Chủ Kho
@@ -1534,10 +1415,10 @@ async function pageDashboard() {
                     <span>
 
                         ${
-                isAdmin()
-                ? 'Phiếu chờ duyệt'
-                : 'Phiếu của tôi đang chờ'
-                }
+                            canViewAllTransactions
+                            ? 'Phiếu chờ duyệt'
+                            : 'Phiếu của tôi đang chờ'
+                        }
 
                     </span>
 
@@ -1558,9 +1439,9 @@ async function pageDashboard() {
 
 
                 ${
-                d.lowStock.length
+                    d.lowStock.length
 
-                ? `
+                    ? `
 
                         <div class="table-wrap">
 
@@ -1571,10 +1452,15 @@ async function pageDashboard() {
                                     <tr>
 
                                         <th>ID</th>
-                                        <th>Tên</th>
-                                        <th class="num">
-                                            Tồn
+
+                                        <th>
+                                            Tên
                                         </th>
+
+                                        <th class="num">
+                                            Tồn Kho
+                                        </th>
+
                                         <th class="num">
                                             Tối thiểu
                                         </th>
@@ -1618,12 +1504,10 @@ async function pageDashboard() {
 
                     `
 
-                : `
+                    : `
 
                         <div class="empty">
-
                             Không có sản phẩm nào dưới mức tối thiểu.
-
                         </div>
 
                     `
@@ -1637,18 +1521,18 @@ async function pageDashboard() {
                 <h2>
 
                     ${
-                isAdmin()
-                ? 'Phiếu gần đây'
-                : 'Phiếu gần đây của tôi'
-                }
+                        canViewAllTransactions
+                        ? 'Phiếu gần đây'
+                        : 'Phiếu gần đây của tôi'
+                    }
 
                 </h2>
 
 
                 ${
-                d.recent.length
+                    d.recent.length
 
-                ? `
+                    ? `
 
                         <div class="table-wrap">
 
@@ -1658,11 +1542,25 @@ async function pageDashboard() {
 
                                     <tr>
 
-                                        <th>Thời gian</th>
-                                        <th>Loại</th>
-                                        <th>Sản phẩm</th>
-                                        <th class="num">SL</th>
-                                        <th>Trạng thái</th>
+                                        <th>
+                                            Thời gian
+                                        </th>
+
+                                        <th>
+                                            Loại
+                                        </th>
+
+                                        <th>
+                                            Sản phẩm
+                                        </th>
+
+                                        <th class="num">
+                                            SL
+                                        </th>
+
+                                        <th>
+                                            Trạng thái
+                                        </th>
 
                                     </tr>
 
@@ -1687,10 +1585,10 @@ async function pageDashboard() {
                                                 >
 
                                                     ${
-                            t.type === 'IN'
-                            ? 'Nhập'
-                            : 'Xuất'
-                            }
+                                                        t.type === 'IN'
+                                                        ? 'Nhập'
+                                                        : 'Xuất'
+                                                    }
 
                                                 </span>
 
@@ -1700,9 +1598,9 @@ async function pageDashboard() {
                                             <td>
 
                                                 ${esc(
-                                    t.product?.name ||
-                                    'Sản phẩm đã xóa'
-                                    )}
+                                                    t.product?.name ||
+                                                    'Sản phẩm đã xóa'
+                                                )}
 
                                             </td>
 
@@ -1717,10 +1615,12 @@ async function pageDashboard() {
                                                 <span
                                                     class="badge ${t.status}"
                                                 >
+
                                                     ${
-                            STATUS[t.status] ||
-                            t.status
-                            }
+                                                        STATUS[t.status] ||
+                                                        t.status
+                                                    }
+
                                                 </span>
 
                                             </td>
@@ -1737,12 +1637,10 @@ async function pageDashboard() {
 
                     `
 
-                : `
+                    : `
 
                         <div class="empty">
-
                             Chưa có phiếu nào.
-
                         </div>
 
                     `
@@ -1763,15 +1661,15 @@ async function pageDashboard() {
             ${err(e.message)}
 
         `);
+
     }
+
 }
 
 
 /* ================= Sản phẩm ================= */
 
 let prod = {};
-
-
 async function pageProducts() {
 
     prod = {
@@ -1782,13 +1680,10 @@ async function pageProducts() {
         editing: null,
         error: ''
     };
-
-
     try {
 
         prod.cats =
                 await api('/categories');
-
     } catch (e) {
 
         prod.error =
@@ -1814,7 +1709,6 @@ async function prodLoad() {
                                 : ''
                                 )
                         );
-
     } catch (e) {
 
         prod.error =
@@ -1830,9 +1724,7 @@ function prodSearch() {
 
     prod.q =
             val('q').trim();
-
     prod.error = '';
-
     prodLoad();
 }
 
@@ -1840,16 +1732,13 @@ function prodSearch() {
 function prodAdd() {
 
     prod.editing = null;
-
     prod.error = '';
-
     prod.form = {
         name: '',
         unit: '',
         quantity: '',
         categoryId: ''
     };
-
     prodDraw();
 }
 
@@ -1860,16 +1749,13 @@ function prodEdit(id) {
             prod.items.find(
                     (x) => x.id === id
             );
-
     if (!p) {
         return;
     }
 
 
     prod.editing = id;
-
     prod.error = '';
-
     prod.form = {
         name: p.name || '',
         unit: p.unit || '',
@@ -1879,7 +1765,6 @@ function prodEdit(id) {
                 ? p.category.id
                 : ''
     };
-
     prodDraw();
 }
 
@@ -1887,9 +1772,7 @@ function prodEdit(id) {
 function prodCancel() {
 
     prod.form = null;
-
     prod.error = '';
-
     prodDraw();
 }
 
@@ -1898,45 +1781,32 @@ async function prodSave() {
 
     const name =
             val('p_name').trim();
-
     const unit =
             val('p_unit').trim();
-
     const categoryId =
             val('p_cat').trim();
-
-
     let quantity = 0;
-
-
     if (!prod.editing) {
 
         const quantityValue =
                 val('p_qty').trim();
-
-
         if (!quantityValue) {
 
             prod.error =
                     'Tồn kho bắt buộc phải nhập';
-
             prod.form = {
                 name,
                 unit,
                 quantity: '',
                 categoryId
             };
-
             prodDraw();
-
             return;
         }
 
 
         quantity =
                 Number(quantityValue);
-
-
         if (
                 !Number.isInteger(quantity) ||
                 quantity <= 0
@@ -1944,16 +1814,13 @@ async function prodSave() {
 
             prod.error =
                     'Tồn kho phải lớn hơn 0';
-
             prod.form = {
                 name,
                 unit,
                 quantity: quantityValue,
                 categoryId
             };
-
             prodDraw();
-
             return;
         }
     }
@@ -1963,7 +1830,6 @@ async function prodSave() {
 
         prod.error =
                 'Tên sản phẩm không được để trống';
-
         prod.form = {
             name,
             unit,
@@ -1973,9 +1839,7 @@ async function prodSave() {
                     : quantity,
             categoryId
         };
-
         prodDraw();
-
         return;
     }
 
@@ -1986,7 +1850,6 @@ async function prodSave() {
 
         prod.error =
                 'Tên sản phẩm không được có ký tự đặc biệt';
-
         prod.form = {
             name,
             unit,
@@ -1996,9 +1859,7 @@ async function prodSave() {
                     : quantity,
             categoryId
         };
-
         prodDraw();
-
         return;
     }
 
@@ -2007,7 +1868,6 @@ async function prodSave() {
 
         prod.error =
                 'Đơn vị không được để trống';
-
         prod.form = {
             name,
             unit,
@@ -2017,9 +1877,7 @@ async function prodSave() {
                     : quantity,
             categoryId
         };
-
         prodDraw();
-
         return;
     }
 
@@ -2030,7 +1888,6 @@ async function prodSave() {
 
         prod.error =
                 'Đơn vị không được có ký tự đặc biệt';
-
         prod.form = {
             name,
             unit,
@@ -2040,9 +1897,7 @@ async function prodSave() {
                     : quantity,
             categoryId
         };
-
         prodDraw();
-
         return;
     }
 
@@ -2051,7 +1906,6 @@ async function prodSave() {
 
         prod.error =
                 'Vui lòng chọn danh mục';
-
         prod.form = {
             name,
             unit,
@@ -2061,9 +1915,7 @@ async function prodSave() {
                     : quantity,
             categoryId
         };
-
         prodDraw();
-
         return;
     }
 
@@ -2071,22 +1923,16 @@ async function prodSave() {
     const body = {
 
         name: name,
-
         unit: unit,
-
         minQuantity: 10,
-
         quantity:
                 prod.editing
                 ? 0
                 : quantity,
-
         category: {
             id: Number(categoryId)
         }
     };
-
-
     try {
 
         await api(
@@ -2100,19 +1946,13 @@ async function prodSave() {
                 body
 
                 );
-
-
         prod.form = null;
-
         prod.error = '';
-
         await prodLoad();
-
     } catch (e) {
 
         prod.error =
                 e.message;
-
         prod.form = {
             name,
             unit,
@@ -2122,7 +1962,6 @@ async function prodSave() {
                     : quantity,
             categoryId
         };
-
         prodDraw();
     }
 }
@@ -2145,13 +1984,10 @@ async function prodDelete(id) {
                 '/products/' + id,
                 'DELETE'
                 );
-
         alert(
                 '✅ Đã xóa sản phẩm thành công!'
                 );
-
         await prodLoad();
-
     } catch (e) {
 
         alert(
@@ -2165,8 +2001,6 @@ function prodFormHtml() {
 
     const f =
             prod.form;
-
-
     const opt = (
             list,
             selected
@@ -2186,8 +2020,6 @@ function prodFormHtml() {
             </option>`
 
                 ).join('');
-
-
     return `
 
         <div class="panel">
@@ -2306,14 +2138,10 @@ function prodDraw() {
 
     const admin =
             isAdmin();
-
     const manager =
             user?.role === 'MANAGER';
-
     const canManage =
             admin || manager;
-
-
     draw(`
 
         <h1>
@@ -2511,12 +2339,8 @@ function prodDraw() {
         </div>
 
     `);
-
-
     const q =
             document.getElementById('q');
-
-
     if (q) {
 
         q.addEventListener(
@@ -2536,31 +2360,23 @@ function prodDraw() {
 /* ================= Phiếu nhập/xuất ================= */
 
 let tx = {};
-
-
 async function pageTransactions() {
 
     tx = {
 
         items: [],
-
         products: [],
-
         form: {
             productId: '',
             type: 'IN',
             quantity: 1,
             note: ''
         },
-
         error: '',
         success: '',
-
         fromDate: '',
         toDate: ''
     };
-
-
     txLoad();
 }
 
@@ -2570,13 +2386,10 @@ async function pageTransactions() {
 async function pageNotifications() {
 
     let list = [];
-
-
     try {
 
         list =
                 await api('/notifications');
-
     } catch (e) {
 
         draw(`
@@ -2588,7 +2401,6 @@ async function pageNotifications() {
             ${err(e.message)}
 
         `);
-
         return;
     }
 
@@ -2681,8 +2493,6 @@ async function pageNotifications() {
             }
 
     `);
-
-
     updateNotificationBadge();
 }
 
@@ -2697,12 +2507,8 @@ async function readNotification(id) {
                 '/read',
                 'POST'
                 );
-
-
         await updateNotificationBadge();
-
         pageNotifications();
-
     } catch (e) {
 
         alert(e.message);
@@ -2718,12 +2524,8 @@ async function readAllNotifications() {
                 '/notifications/read-all',
                 'POST'
                 );
-
-
         await updateNotificationBadge();
-
         pageNotifications();
-
     } catch (e) {
 
         alert(e.message);
@@ -2739,10 +2541,8 @@ async function txLoad() {
 
         tx.items =
                 await api('/transactions');
-
         tx.products =
                 await api('/products');
-
     } catch (e) {
 
         tx.error =
@@ -2762,31 +2562,22 @@ async function txCreate() {
 
         productId:
                 val('t_prod'),
-
         type:
                 val('t_type'),
-
         quantity:
                 parseInt(
                         val('t_qty')
                         ) || 0,
-
         note:
                 val('t_note')
     };
-
-
     tx.error = '';
     tx.success = '';
-
-
     if (!tx.form.productId) {
 
         tx.error =
                 'Vui lòng chọn sản phẩm.';
-
         txDraw();
-
         return;
     }
 
@@ -2795,9 +2586,7 @@ async function txCreate() {
 
         tx.error =
                 'Số lượng phải lớn hơn 0.';
-
         txDraw();
-
         return;
     }
 
@@ -2814,9 +2603,7 @@ async function txCreate() {
 
         tx.error =
                 'Người dùng chỉ được yêu cầu xuất tối đa 10 sản phẩm mỗi phiếu.';
-
         txDraw();
-
         return;
     }
 
@@ -2829,8 +2616,6 @@ async function txCreate() {
                         'POST',
                         tx.form
                         );
-
-
         /*
          * Thông báo cho người vừa tạo phiếu.
          */
@@ -2841,23 +2626,17 @@ async function txCreate() {
                 (saved.id || '') +
                 ' đã được tạo thành công.'
                 );
-
-
         await updateNotificationBadge();
-
-
         if (user?.role === 'ADMIN') {
 
             tx.success =
                     'Đã tạo phiếu và cập nhật tồn kho.';
-
         } else if (
                 tx.form.type === 'OUT'
                 ) {
 
             tx.success =
                     'Đã gửi yêu cầu xuất kho. Vui lòng chờ ADMIN duyệt.';
-
         } else {
 
             tx.success =
@@ -2868,23 +2647,16 @@ async function txCreate() {
         tx.form = {
 
             productId: '',
-
             type:
                     tx.form.type,
-
             quantity: 1,
-
             note: ''
         };
-
-
         await txLoad();
-
     } catch (e) {
 
         tx.error =
                 e.message;
-
         txDraw();
     }
 }
@@ -2900,18 +2672,14 @@ async function txAct(
 
     tx.error = '';
     tx.success = '';
-
-
     try {
 
         await api(
                 path,
                 method
                 );
-
         tx.success =
                 message;
-
     } catch (e) {
 
         tx.error =
@@ -2931,8 +2699,6 @@ const txApprove = (id) =>
             'POST',
             'Đã duyệt phiếu'
             );
-
-
 const txReject = (id) =>
     txAct(
             '/transactions/' +
@@ -2941,8 +2707,6 @@ const txReject = (id) =>
             'POST',
             'Đã từ chối phiếu'
             );
-
-
 const txCancel = (id) => {
 
     if (
@@ -2957,8 +2721,6 @@ const txCancel = (id) => {
                 );
     }
 };
-
-
 const txCanCancel = (t) =>
     t.status === 'PENDING' &&
             (
@@ -2969,33 +2731,24 @@ const txCanCancel = (t) =>
                             t.createdBy.id === user.id
                             )
                     );
-
-
 function txFilterDate() {
 
     const from =
             document.getElementById(
                     'tx_from_date'
                     );
-
     const to =
             document.getElementById(
                     'tx_to_date'
                     );
-
-
     tx.fromDate =
             from
             ? from.value
             : '';
-
-
     tx.toDate =
             to
             ? to.value
             : '';
-
-
     txDraw();
 }
 
@@ -3006,8 +2759,6 @@ function txDraw() {
 
     const f =
             tx.form;
-
-
     const filteredItems =
             tx.items.filter(t => {
 
@@ -3024,8 +2775,6 @@ function txDraw() {
                         new Date(
                                 t.createdAt
                                 );
-
-
                 if (
                         isNaN(
                                 date.getTime()
@@ -3046,8 +2795,6 @@ function txDraw() {
                         String(
                                 date.getDate()
                                 ).padStart(2, '0');
-
-
                 if (
                         tx.fromDate &&
                         itemDate < tx.fromDate
@@ -3068,8 +2815,6 @@ function txDraw() {
 
                 return true;
             });
-
-
     draw(`
 
         <h1>
@@ -3481,16 +3226,13 @@ const CRUD = {
     categories: {
 
         title: 'Danh mục',
-
         endpoint: '/categories',
-
         fields: [
 
             {
                 key: 'name',
                 label: 'Tên danh mục'
             },
-
             {
                 key: 'description',
                 label: 'Mô tả'
@@ -3498,13 +3240,10 @@ const CRUD = {
 
         ]
     },
-
     users: {
 
         title: 'Người dùng',
-
         endpoint: '/users',
-
         fields: [
 
             {
@@ -3512,7 +3251,6 @@ const CRUD = {
                 label: 'Tên đăng nhập',
                 lockOnEdit: true
             },
-
             {
                 key: 'password',
                 label: 'Mật khẩu',
@@ -3521,17 +3259,14 @@ const CRUD = {
                 hint:
                         'Để trống khi sửa nếu không đổi'
             },
-
             {
                 key: 'fullName',
                 label: 'Họ tên'
             },
-
             {
                 key: 'email',
                 label: 'Email'
             },
-
             {
                 key: 'role',
                 label: 'Vai trò',
@@ -3542,7 +3277,6 @@ const CRUD = {
                     'MANAGER'
                 ]
             },
-
             {
                 key: 'active',
                 label: 'Đang hoạt động',
@@ -3552,32 +3286,20 @@ const CRUD = {
         ]
     }
 };
-
-
 let crud = null;
-
-
 async function pageCrud(key) {
 
     crud = {
 
         key,
-
         cfg:
                 CRUD[key],
-
         items: [],
-
         editing: null,
-
         values: null,
-
         error: '',
-
         search: ''
     };
-
-
     crudLoad();
 }
 
@@ -3590,7 +3312,6 @@ async function crudLoad() {
                 await api(
                         crud.cfg.endpoint
                         );
-
     } catch (e) {
 
         crud.error =
@@ -3608,14 +3329,10 @@ function crudSearch() {
             document.getElementById(
                     'crud_search'
                     );
-
-
     crud.search =
             input
             ? input.value.trim()
             : '';
-
-
     crudDraw();
 }
 
@@ -3623,8 +3340,6 @@ function crudSearch() {
 function crudBlank() {
 
     const v = {};
-
-
     crud.cfg.fields.forEach((f) => {
 
         v[f.key] =
@@ -3633,10 +3348,7 @@ function crudBlank() {
                 : f.options
                 ? f.options[0]
                 : '';
-
     });
-
-
     return v;
 }
 
@@ -3644,12 +3356,9 @@ function crudBlank() {
 function crudAdd() {
 
     crud.editing = null;
-
     crud.error = '';
-
     crud.values =
             crudBlank();
-
     crudDraw();
 }
 
@@ -3660,19 +3369,13 @@ function crudEdit(id) {
             crud.items.find(
                     (x) => x.id === id
             );
-
-
     crud.editing =
             id;
-
     crud.error = '';
-
     crud.values = {
         ...crudBlank(),
         ...it
     };
-
-
     crud.cfg.fields
             .filter(
                     (f) => f.type === 'password'
@@ -3680,10 +3383,7 @@ function crudEdit(id) {
             .forEach((f) => {
 
                 crud.values[f.key] = '';
-
             });
-
-
     crudDraw();
 }
 
@@ -3691,9 +3391,7 @@ function crudEdit(id) {
 function crudCancel() {
 
     crud.values = null;
-
     crud.error = '';
-
     crudDraw();
 }
 
@@ -3701,8 +3399,6 @@ function crudCancel() {
 async function crudSave() {
 
     const v = {};
-
-
     /*
      * Lấy dữ liệu từ form
      */
@@ -3718,8 +3414,6 @@ async function crudSave() {
                 document.getElementById(
                         'f_' + f.key
                         );
-
-
         if (!el) {
             return;
         }
@@ -3729,10 +3423,7 @@ async function crudSave() {
                 f.type === 'checkbox'
                 ? el.checked
                 : el.value.trim();
-
     });
-
-
     /* ================= DANH MỤC ================= */
 
     if (crud.key === 'categories') {
@@ -3741,11 +3432,8 @@ async function crudSave() {
 
             crud.error =
                     'Tên danh mục không được để trống';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3754,11 +3442,8 @@ async function crudSave() {
 
             crud.error =
                     'Mô tả không được để trống';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3771,11 +3456,8 @@ async function crudSave() {
 
             crud.error =
                     'Tên danh mục không được có ký tự đặc biệt';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
     }
@@ -3789,11 +3471,8 @@ async function crudSave() {
 
             crud.error =
                     'Tên đăng nhập không được để trống';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3806,11 +3485,8 @@ async function crudSave() {
 
             crud.error =
                     'Tên đăng nhập chỉ được dùng chữ, số và dấu _';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3822,11 +3498,8 @@ async function crudSave() {
 
             crud.error =
                     'Mật khẩu không được để trống';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3838,11 +3511,8 @@ async function crudSave() {
 
             crud.error =
                     'Mật khẩu phải từ 6 ký tự';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3851,11 +3521,8 @@ async function crudSave() {
 
             crud.error =
                     'Họ tên không được để trống';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3864,11 +3531,8 @@ async function crudSave() {
 
             crud.error =
                     'Email không được để trống';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3881,11 +3545,8 @@ async function crudSave() {
 
             crud.error =
                     'Email không hợp lệ';
-
             crud.values = v;
-
             crudDraw();
-
             return;
         }
 
@@ -3916,8 +3577,6 @@ async function crudSave() {
                         ? '/' + crud.editing
                         : ''
                         );
-
-
         await api(
                 url,
                 crud.editing
@@ -3926,23 +3585,15 @@ async function crudSave() {
                 v
 
                 );
-
-
         crud.values = null;
-
         crud.editing = null;
-
         crud.error = '';
-
         await crudLoad();
-
     } catch (e) {
 
         crud.error =
                 e.message;
-
         crud.values = v;
-
         crudDraw();
     }
 }
@@ -3956,18 +3607,12 @@ async function crudDelete(id) {
                 'danh mục'
 
     };
-
-
     const type =
             crud.cfg.endpoint
             .replace('/api/', '');
-
-
     const name =
             typeName[type] ||
             'mục này';
-
-
     if (
             !confirm(
                     `Bạn có chắc muốn xóa ${name} này?`
@@ -3986,34 +3631,23 @@ async function crudDelete(id) {
                 id,
                 'DELETE'
                 );
-
-
         crud.error = '';
-
         await crudLoad();
-
-
         alert(
                 `✅ Đã xóa ${name} thành công!`
                 );
-
     } catch (e) {
 
         console.error(
                 'LỖI XÓA:',
                 e
                 );
-
-
         alert(
                 '❌ Lỗi xóa: ' +
                 e.message
                 );
-
-
         crud.error =
                 e.message;
-
         crudDraw();
     }
 }
@@ -4023,8 +3657,6 @@ function crudFormHtml() {
 
     const v =
             crud.values;
-
-
     const inputs =
             crud.cfg.fields
 
@@ -4036,8 +3668,6 @@ function crudFormHtml() {
 
                 const id =
                         'f_' + f.key;
-
-
                 if (f.type === 'select') {
 
                     return `
@@ -4073,8 +3703,6 @@ function crudFormHtml() {
 
                 let placeholder =
                         f.hint || '';
-
-
                 if (
                         crud.key === 'categories'
                         ) {
@@ -4143,8 +3771,6 @@ function crudFormHtml() {
 
                         ? 'disabled'
                         : '';
-
-
                 return `
 
                 <label>
@@ -4166,11 +3792,8 @@ function crudFormHtml() {
                 </label>
 
                 `;
-
             })
             .join('');
-
-
     return `
 
         <div class="panel">
@@ -4216,14 +3839,10 @@ function crudDraw() {
             crud.cfg.fields.filter(
                     f => !f.hideInTable
             );
-
-
     const keyword =
             (crud.search || '')
             .toLowerCase()
             .trim();
-
-
     const filteredItems =
             crud.items.filter(item => {
 
@@ -4237,15 +3856,10 @@ function crudDraw() {
                         .join(' ')
 
                         .toLowerCase();
-
-
                 return text.includes(
                         keyword
                         );
-
             });
-
-
     draw(`
 
         <h1>
@@ -4421,14 +4035,10 @@ function crudDraw() {
         </div>
 
     `);
-
-
     const search =
             document.getElementById(
                     'crud_search'
                     );
-
-
     if (search) {
 
         search.addEventListener(
@@ -4450,29 +4060,19 @@ function crudDraw() {
 let lectures = {
 
     items: [],
-
     form: null,
-
     editing: null,
-
     error: ''
 };
-
-
 async function pageLectures() {
 
     lectures = {
 
         items: [],
-
         form: null,
-
         editing: null,
-
         error: ''
     };
-
-
     await lectureLoad();
 }
 
@@ -4483,9 +4083,7 @@ async function lectureLoad() {
 
         lectures.items =
                 await api('/lectures');
-
         lectures.error = '';
-
     } catch (e) {
 
         lectures.error =
@@ -4500,17 +4098,12 @@ async function lectureLoad() {
 function lectureAdd() {
 
     lectures.editing = null;
-
     lectures.error = '';
-
     lectures.form = {
 
         name: '',
-
         link: ''
     };
-
-
     lectureDraw();
 }
 
@@ -4521,8 +4114,6 @@ function lectureEdit(id) {
             lectures.items.find(
                     x => x.id === id
             );
-
-
     if (!item) {
         return;
     }
@@ -4530,19 +4121,14 @@ function lectureEdit(id) {
 
     lectures.editing =
             id;
-
     lectures.error = '';
-
     lectures.form = {
 
         name:
                 item.name || '',
-
         link:
                 item.link || ''
     };
-
-
     lectureDraw();
 }
 
@@ -4550,11 +4136,8 @@ function lectureEdit(id) {
 function lectureCancel() {
 
     lectures.form = null;
-
     lectures.editing = null;
-
     lectures.error = '';
-
     lectureDraw();
 }
 
@@ -4563,18 +4146,13 @@ async function lectureSave() {
 
     const name =
             val('lecture_name').trim();
-
     const link =
             val('lecture_link').trim();
-
-
     if (!name) {
 
         lectures.error =
                 'Tên bài giảng không được để trống';
-
         lectureDraw();
-
         return;
     }
 
@@ -4583,9 +4161,7 @@ async function lectureSave() {
 
         lectures.error =
                 'Link bài giảng không được để trống';
-
         lectureDraw();
-
         return;
     }
 
@@ -4596,9 +4172,7 @@ async function lectureSave() {
 
         lectures.error =
                 'Link phải bắt đầu bằng http:// hoặc https://';
-
         lectureDraw();
-
         return;
     }
 
@@ -4606,11 +4180,8 @@ async function lectureSave() {
     const body = {
 
         name: name,
-
         link: link
     };
-
-
     try {
 
         if (lectures.editing) {
@@ -4621,12 +4192,9 @@ async function lectureSave() {
                     'PUT',
                     body
                     );
-
-
             alert(
                     'Đã sửa bài giảng!'
                     );
-
         } else {
 
             await api(
@@ -4634,8 +4202,6 @@ async function lectureSave() {
                     'POST',
                     body
                     );
-
-
             alert(
                     'Đã thêm bài giảng!'
                     );
@@ -4643,18 +4209,13 @@ async function lectureSave() {
 
 
         lectures.form = null;
-
         lectures.editing = null;
-
         lectures.error = '';
-
         await lectureLoad();
-
     } catch (e) {
 
         lectures.error =
                 e.message;
-
         lectureDraw();
     }
 }
@@ -4679,20 +4240,14 @@ async function lectureDelete(id) {
                 id,
                 'DELETE'
                 );
-
-
         alert(
                 'Đã xóa bài giảng!'
                 );
-
-
         await lectureLoad();
-
     } catch (e) {
 
         lectures.error =
                 e.message;
-
         lectureDraw();
     }
 }
@@ -4717,8 +4272,6 @@ function lectureFormHtml() {
 
     const f =
             lectures.form;
-
-
     return `
 
         <div class="panel">
@@ -4798,34 +4351,24 @@ function lectureFormHtml() {
 function lectureDraw() {
 
     const canManage = true;
-
-
     const keyword =
             (lectures.search || '')
             .toLowerCase()
             .trim();
-
-
     const filteredItems =
             lectures.items.filter(item => {
 
                 const name =
                         (item.name || '')
                         .toLowerCase();
-
                 const link =
                         (item.link || '')
                         .toLowerCase();
-
-
                 return (
                         name.includes(keyword) ||
                         link.includes(keyword)
                         );
-
             });
-
-
     draw(`
 
         <h1>
@@ -5022,14 +4565,10 @@ function lectureSearch() {
             document.getElementById(
                     'lecture_search'
                     );
-
-
     lectures.search =
             input
             ? input.value.trim()
             : '';
-
-
     lectureDraw();
 }
 
@@ -5177,14 +4716,10 @@ async function changePassword() {
 
     const oldPassword =
             val('pw_old');
-
     const newPassword =
             val('pw_new');
-
     const confirmPassword =
             val('pw_confirm');
-
-
     /* ================= KIỂM TRA ================= */
 
     if (!oldPassword) {
@@ -5193,7 +4728,6 @@ async function changePassword() {
                 'Mật khẩu hiện tại không được để trống',
                 true
                 );
-
         return;
     }
 
@@ -5204,7 +4738,6 @@ async function changePassword() {
                 'Mật khẩu mới không được để trống',
                 true
                 );
-
         return;
     }
 
@@ -5215,7 +4748,6 @@ async function changePassword() {
                 'Mật khẩu mới phải từ 6 ký tự',
                 true
                 );
-
         return;
     }
 
@@ -5226,7 +4758,6 @@ async function changePassword() {
                 'Vui lòng xác nhận mật khẩu mới',
                 true
                 );
-
         return;
     }
 
@@ -5239,7 +4770,6 @@ async function changePassword() {
                 'Mật khẩu xác nhận không khớp',
                 true
                 );
-
         return;
     }
 
@@ -5252,7 +4782,6 @@ async function changePassword() {
                 'Mật khẩu mới phải khác mật khẩu hiện tại',
                 true
                 );
-
         return;
     }
 
@@ -5267,18 +4796,14 @@ async function changePassword() {
                 {
                     oldPassword:
                             oldPassword,
-
                     newPassword:
                             newPassword
                 }
 
         );
-
-
         pageProfile(
                 'Đổi mật khẩu thành công!'
                 );
-
     } catch (e) {
 
         pageProfile(
@@ -5295,5 +4820,4 @@ window.addEventListener(
         'hashchange',
         render
         );
-
 render();
