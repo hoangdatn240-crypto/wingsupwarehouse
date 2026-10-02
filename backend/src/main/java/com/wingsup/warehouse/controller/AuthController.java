@@ -13,6 +13,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Random;
@@ -28,9 +29,16 @@ public class AuthController {
     private final JavaMailSender mailSender;
 
     /*
-     * Lưu OTP tạm thời trong RAM
+     * =========================================================
+     * LƯU OTP TẠM THỜI TRONG RAM
      *
-     * email -> OTP
+     * email -> thông tin OTP
+     *
+     * OTP:
+     * - Hết hạn sau 5 phút
+     * - Chỉ gửi lại sau 60 giây
+     * - Tối đa 5 lần trong 15 phút
+     * =========================================================
      */
     private final Map<String, OtpData> otpStore =
             new ConcurrentHashMap<>();
@@ -81,9 +89,17 @@ public class AuthController {
     ) {
     }
 
+    /*
+     * =========================================================
+     * DỮ LIỆU OTP
+     * =========================================================
+     */
     private record OtpData(
             String code,
-            LocalDateTime expiresAt
+            LocalDateTime expiresAt,
+            LocalDateTime lastSentAt,
+            int sendCount,
+            LocalDateTime windowStartedAt
     ) {
     }
 
@@ -92,86 +108,111 @@ public class AuthController {
     // =========================================================
 
     @PostMapping("/login")
-public Map<String, Object> login(
-        @RequestBody LoginRequest req
-) {
+    public Map<String, Object> login(
+            @RequestBody LoginRequest req
+    ) {
 
-    System.out.println("========== LOGIN ==========");
-    System.out.println("Username nhận được: " + req.username());
-    System.out.println("Password có dữ liệu: "
-            + (req.password() != null && !req.password().isBlank()));
-
-    if (req.username() == null
-            || req.username().isBlank()) {
-
-        throw new IllegalArgumentException(
-                "Tên đăng nhập không được để trống"
+        System.out.println("========== LOGIN ==========");
+        System.out.println(
+                "Username nhận được: "
+                + req.username()
         );
-    }
 
-    if (req.password() == null
-            || req.password().isBlank()) {
-
-        throw new IllegalArgumentException(
-                "Mật khẩu không được để trống"
+        System.out.println(
+                "Password có dữ liệu: "
+                + (
+                        req.password() != null
+                        && !req.password().isBlank()
+                )
         );
-    }
 
-    String username = req.username().trim();
+        if (req.username() == null
+                || req.username().isBlank()) {
 
-    System.out.println("Đang tìm user: " + username);
-
-    AppUser user = users.findByUsername(username)
-            .orElseThrow(() ->
-                    new IllegalArgumentException(
-                            "Tài khoản không tồn tại: " + username
-                    )
+            throw new IllegalArgumentException(
+                    "Tên đăng nhập không được để trống"
             );
+        }
 
-    System.out.println("Đã tìm thấy user ID: " + user.getId());
+        if (req.password() == null
+                || req.password().isBlank()) {
 
-    if (user.getPassword() == null
-            || user.getPassword().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Mật khẩu không được để trống"
+            );
+        }
 
-        throw new IllegalArgumentException(
-                "Tài khoản chưa có mật khẩu trong database"
+        String username =
+                req.username().trim();
+
+        System.out.println(
+                "Đang tìm user: "
+                + username
+        );
+
+        AppUser user =
+                users.findByUsername(username)
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "Tài khoản không tồn tại: "
+                                        + username
+                                )
+                        );
+
+        System.out.println(
+                "Đã tìm thấy user ID: "
+                + user.getId()
+        );
+
+        if (user.getPassword() == null
+                || user.getPassword().isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "Tài khoản chưa có mật khẩu trong database"
+            );
+        }
+
+        boolean passwordCorrect =
+                encoder.matches(
+                        req.password(),
+                        user.getPassword()
+                );
+
+        System.out.println(
+                "Mật khẩu đúng: "
+                + passwordCorrect
+        );
+
+        if (!passwordCorrect) {
+
+            throw new IllegalArgumentException(
+                    "Mật khẩu không đúng"
+            );
+        }
+
+        user.setActive(true);
+
+        user.setLastActiveAt(
+                LocalDateTime.now()
+        );
+
+        users.save(user);
+
+        String token =
+                tokens.create(user.getId());
+
+        System.out.println(
+                "LOGIN THÀNH CÔNG - User ID: "
+                + user.getId()
+        );
+
+        return Map.of(
+                "token",
+                token,
+                "user",
+                user
         );
     }
-
-    boolean passwordCorrect = encoder.matches(
-            req.password(),
-            user.getPassword()
-    );
-
-    System.out.println(
-            "Mật khẩu đúng: " + passwordCorrect
-    );
-
-    if (!passwordCorrect) {
-
-        throw new IllegalArgumentException(
-                "Mật khẩu không đúng"
-        );
-    }
-
-    user.setActive(true);
-
-    user.setLastActiveAt(
-            LocalDateTime.now()
-    );
-
-    users.save(user);
-
-    String token = tokens.create(user.getId());
-
-    System.out.println("LOGIN THÀNH CÔNG - User ID: "
-            + user.getId());
-
-    return Map.of(
-            "token", token,
-            "user", user
-    );
-}
 
     // =========================================================
     // HEARTBEAT
@@ -281,7 +322,8 @@ public Map<String, Object> login(
             );
         }
 
-        AppUser user = new AppUser();
+        AppUser user =
+                new AppUser();
 
         user.setUsername(
                 req.username().trim()
@@ -299,10 +341,14 @@ public Map<String, Object> login(
 
         user.setEmail(email);
 
-        // Người tự đăng ký chỉ được tạo USER
+        /*
+         * Người tự đăng ký chỉ được tạo USER
+         */
         user.setRole(Role.USER);
 
-        // Tài khoản mới chưa đăng nhập
+        /*
+         * Tài khoản mới chưa đăng nhập
+         */
         user.setActive(false);
 
         user.setLastActiveAt(null);
@@ -422,7 +468,7 @@ public Map<String, Object> login(
     // =========================================================
 
     @PostMapping("/forgot-password")
-    public Map<String, String> forgotPassword(
+    public synchronized Map<String, String> forgotPassword(
             @RequestBody ForgotPasswordRequest req
     ) {
 
@@ -458,48 +504,231 @@ public Map<String, Object> login(
                                 )
                         );
 
+        LocalDateTime now =
+                LocalDateTime.now();
+
         /*
-         * Tạo OTP 6 số
+         * =====================================================
+         * LẤY OTP CŨ
+         * =====================================================
          */
+        OtpData oldOtp =
+                otpStore.get(email);
+
+        /*
+         * =====================================================
+         * NẾU EMAIL ĐÃ TỪNG YÊU CẦU OTP
+         * =====================================================
+         */
+        if (oldOtp != null) {
+
+            /*
+             * -------------------------------------------------
+             * 1. CHẶN GỬI LIÊN TỤC
+             * -------------------------------------------------
+             */
+            if (oldOtp.lastSentAt() != null) {
+
+                long seconds =
+                        Duration.between(
+                                oldOtp.lastSentAt(),
+                                now
+                        ).getSeconds();
+
+                if (seconds < 60) {
+
+                    long remaining =
+                            60 - seconds;
+
+                    throw new IllegalArgumentException(
+                            "Vui lòng chờ "
+                            + remaining
+                            + " giây trước khi yêu cầu OTP mới"
+                    );
+                }
+            }
+
+            /*
+             * -------------------------------------------------
+             * 2. KIỂM TRA CỬA SỔ 15 PHÚT
+             * -------------------------------------------------
+             */
+            LocalDateTime windowStart =
+                    oldOtp.windowStartedAt();
+
+            int sendCount =
+                    oldOtp.sendCount();
+
+            /*
+             * Nếu đã qua 15 phút
+             * → reset bộ đếm
+             */
+            if (windowStart == null
+                    || Duration.between(
+                            windowStart,
+                            now
+                    ).toMinutes() >= 15) {
+
+                windowStart = now;
+                sendCount = 0;
+            }
+
+            /*
+             * -------------------------------------------------
+             * 3. TỐI ĐA 5 LẦN / 15 PHÚT
+             * -------------------------------------------------
+             */
+            if (sendCount >= 5) {
+
+                long elapsedMinutes =
+                        Duration.between(
+                                windowStart,
+                                now
+                        ).toMinutes();
+
+                long remainingMinutes =
+                        15 - elapsedMinutes;
+
+                if (remainingMinutes < 1) {
+                    remainingMinutes = 1;
+                }
+
+                throw new IllegalArgumentException(
+                        "Bạn đã yêu cầu OTP quá nhiều lần. "
+                        + "Vui lòng thử lại sau "
+                        + remainingMinutes
+                        + " phút"
+                );
+            }
+
+            /*
+             * -------------------------------------------------
+             * 4. TẠO OTP MỚI
+             * -------------------------------------------------
+             */
+            String code =
+                    String.format(
+                            "%06d",
+                            random.nextInt(1_000_000)
+                    );
+
+            LocalDateTime expiresAt =
+                    now.plusMinutes(5);
+
+            /*
+             * -------------------------------------------------
+             * 5. GỬI EMAIL TRƯỚC
+             *
+             * Nếu gửi thất bại:
+             * → không tăng sendCount
+             * → OTP cũ vẫn còn
+             * -------------------------------------------------
+             */
+            try {
+
+                sendOtpEmail(
+                        user,
+                        code
+                );
+
+            } catch (Exception e) {
+
+                throw new IllegalArgumentException(
+                        "Không thể gửi email OTP. "
+                        + "Vui lòng thử lại sau."
+                );
+            }
+
+            /*
+             * -------------------------------------------------
+             * 6. CHỈ LƯU OTP SAU KHI GỬI EMAIL THÀNH CÔNG
+             * -------------------------------------------------
+             */
+            sendCount++;
+
+            otpStore.put(
+                    email,
+                    new OtpData(
+                            code,
+                            expiresAt,
+                            now,
+                            sendCount,
+                            windowStart
+                    )
+            );
+
+            return Map.of(
+                    "message",
+                    "Mã OTP đã được gửi đến email của bạn"
+            );
+        }
+
+        /*
+         * =====================================================
+         * LẦN ĐẦU YÊU CẦU OTP
+         * =====================================================
+         */
+
         String code =
                 String.format(
                         "%06d",
                         random.nextInt(1_000_000)
                 );
 
-        /*
-         * OTP có hiệu lực 5 phút
-         */
         LocalDateTime expiresAt =
-                LocalDateTime.now()
-                        .plusMinutes(5);
+                now.plusMinutes(5);
 
+        /*
+         * Gửi email trước
+         */
+        try {
+
+            sendOtpEmail(
+                    user,
+                    code
+            );
+
+        } catch (Exception e) {
+
+            throw new IllegalArgumentException(
+                    "Không thể gửi email OTP. "
+                    + "Vui lòng thử lại sau."
+            );
+        }
+
+        /*
+         * Email gửi thành công
+         * → lưu OTP
+         */
         otpStore.put(
                 email,
                 new OtpData(
                         code,
-                        expiresAt
+                        expiresAt,
+                        now,
+                        1,
+                        now
                 )
         );
 
-        /*
-         * Tạo email
-         *
-         * Gmail trong spring.mail.username
-         * sẽ là Gmail hệ thống gửi mail.
-         *
-         * user.getEmail()
-         * là email của người đang quên mật khẩu.
-         */
+        return Map.of(
+                "message",
+                "Mã OTP đã được gửi đến email của bạn"
+        );
+    }
+
+    // =========================================================
+    // GỬI EMAIL OTP
+    // =========================================================
+
+    private void sendOtpEmail(
+            AppUser user,
+            String code
+    ) {
+
         SimpleMailMessage message =
                 new SimpleMailMessage();
 
-        /*
-         * Không bắt buộc setFrom.
-         *
-         * Spring Mail sẽ sử dụng
-         * spring.mail.username làm tài khoản gửi.
-         */
         message.setTo(
                 user.getEmail()
         );
@@ -529,15 +758,7 @@ public Map<String, Object> login(
                 + "Wings Up - Edu Success"
         );
 
-        /*
-         * Gửi email
-         */
         mailSender.send(message);
-
-        return Map.of(
-                "message",
-                "Mã OTP đã được gửi đến email của bạn"
-        );
     }
 
     // =========================================================

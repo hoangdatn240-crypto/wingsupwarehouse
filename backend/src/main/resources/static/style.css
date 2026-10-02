@@ -3561,3 +3561,23 @@ textarea:focus {
         font-size: 9px;
     }
 }
+
+.otp-status {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+}
+
+.otp-status.loading {
+    display: block;
+}
+
+.otp-status.success {
+    display: block;
+}
+
+.otp-status.error {
+    display: block;
+}

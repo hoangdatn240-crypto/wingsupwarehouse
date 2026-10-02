@@ -31,6 +31,187 @@ const STATUS = {
 };
 let token = localStorage.getItem('token');
 let user = JSON.parse(localStorage.getItem('user') || 'null');
+
+// ================= TỰ ĐĂNG XUẤT KHI KHÔNG HOẠT ĐỘNG =================
+
+let inactivityTimer = null;
+let inactivityCountdown = null;
+let inactivitySeconds = 60;
+
+function hideInactivityTimer() {
+    const box =
+            document.getElementById('inactivityTimer');
+
+    if (box) {
+        box.style.display = 'none';
+    }
+}
+
+function showInactivityTimer() {
+    const box =
+            document.getElementById('inactivityTimer');
+
+    const count =
+            document.getElementById('logoutCountdown');
+
+    if (box) {
+        box.style.display = 'block';
+    }
+
+    if (count) {
+        count.innerText = inactivitySeconds;
+    }
+}
+
+function startInactivityLogout() {
+
+    clearTimeout(inactivityTimer);
+    clearInterval(inactivityCountdown);
+
+    if (!token) {
+        hideInactivityTimer();
+        return;
+    }
+
+    inactivitySeconds = 60;
+
+    // Đủ 60 giây nên ẩn timer
+    hideInactivityTimer();
+
+    inactivityCountdown = setInterval(() => {
+
+        inactivitySeconds--;
+
+        // Chỉ hiện khi còn dưới 60 giây
+        if (inactivitySeconds < 60) {
+            showInactivityTimer();
+        }
+
+        if (inactivitySeconds <= 0) {
+
+            clearInterval(inactivityCountdown);
+
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+
+            token = null;
+            user = null;
+
+            hideInactivityTimer();
+
+            alert(
+                    '⏰ Phiên đăng nhập đã hết hạn.\n' +
+                    'Vui lòng đăng nhập lại.'
+                    );
+
+            pageLogin();
+        }
+
+    }, 1000);
+}
+
+function resetInactivityTimer() {
+
+    if (!token) {
+        return;
+    }
+
+    clearTimeout(inactivityTimer);
+    clearInterval(inactivityCountdown);
+
+    inactivitySeconds = 60;
+
+    // Người dùng vừa hoạt động → ẩn timer
+    hideInactivityTimer();
+
+    // Bắt đầu lại từ 60 giây
+    startInactivityLogout();
+}
+
+
+// ================= HOẠT ĐỘNG NGƯỜI DÙNG =================
+
+document.addEventListener(
+        'click',
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        'keydown',
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        'mousemove',
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        'scroll',
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        'touchstart',
+        resetInactivityTimer
+        );
+
+function resetInactivityTimer() {
+
+    if (!token) {
+        return;
+    }
+
+    startInactivityLogout();
+}
+
+document.addEventListener(
+        'click',
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        'keydown',
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        'mousemove',
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        'scroll',
+        resetInactivityTimer
+        );
+function resetInactivityTimer() {
+
+    if (!token) {
+        return;
+    }
+
+    startInactivityLogout();
+}
+
+document.addEventListener(
+        "click",
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        "keydown",
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        "mousemove",
+        resetInactivityTimer
+        );
+
+document.addEventListener(
+        "scroll",
+        resetInactivityTimer
+        );
 let isFirstLogin =
         sessionStorage.getItem('wingsup_first_login') === 'true';
 const isAdmin = () => !!user && user.role === 'ADMIN';
@@ -392,6 +573,7 @@ function layout() {
         ['#/lectures', '📚 Bài giảng'],
         ['#/special-requests', '💬 Yêu cầu đặc biệt']
     ];
+
     /* ADMIN và MANAGER được dùng Danh mục */
 
     if (
@@ -417,12 +599,17 @@ function layout() {
 
     const here =
             location.hash || '#/';
+
     document.getElementById('app').innerHTML = `
 
         <header class="topbar">
 
-            <a href="#/" class="brand" onclick="closeMobileMenu()">
-            Wings <b>Up</b> · Kho
+            <a
+                href="#/"
+                class="brand"
+                onclick="closeMobileMenu()"
+            >
+                Wings <b>Up</b> · Kho
             </a>
 
 
@@ -456,60 +643,64 @@ function layout() {
     ).join('')}
 
 
-<!-- THÔNG BÁO TRONG MENU 3 GẠCH -->
+                <!-- THÔNG BÁO TRONG MENU 3 GẠCH -->
 
-<a
-    href="#/notifications"
-    class="mobile-notification"
-    onclick="closeMobileMenu()"
->
-    🔔 Thông báo
-    <span id="notificationBadgeMobile"></span>
-</a>
+                <a
+                    href="#/notifications"
+                    class="mobile-notification"
+                    onclick="closeMobileMenu()"
+                >
+                    🔔 Thông báo
+                    <span id="notificationBadgeMobile"></span>
+                </a>
 
-<!-- TÀI KHOẢN + ĐĂNG XUẤT TRONG MENU 3 GẠCH -->
 
-<div class="mobile-account">
+                <!-- TÀI KHOẢN + ĐĂNG XUẤT TRONG MENU 3 GẠCH -->
 
-    <a
-        href="#/profile"
-        class="mobile-user-info"
-        onclick="closeMobileMenu()"
-    >
-        <span class="mobile-user-name">
-            ${esc(
+                <div class="mobile-account">
+
+                    <a
+                        href="#/profile"
+                        class="mobile-user-info"
+                        onclick="closeMobileMenu()"
+                    >
+
+                        <span class="mobile-user-name">
+                            ${esc(
             user?.fullName ||
             user?.username ||
             'Người dùng'
             )}
-        </span>
+                        </span>
 
-        <span class="mobile-user-role">
-            ${
+                        <span class="mobile-user-role">
+                            ${
             user?.role === 'ADMIN'
             ? 'Quản trị viên Wings Up'
             : user?.role === 'MANAGER'
             ? 'Quản lý Wings Up'
             : 'Người dùng Wings Up'
             }
-        </span>
-    </a>
+                        </span>
 
-    <a
-        href="#"
-        class="mobile-logout"
-        onclick="
-            closeMobileMenu();
-            logout();
-            return false;
-        "
-    >
-        🚪 Đăng xuất
-    </a>
+                    </a>
 
-</div>
 
-</nav>
+                    <a
+                        href="#"
+                        class="mobile-logout"
+                        onclick="
+                            closeMobileMenu();
+                            logout();
+                            return false;
+                        "
+                    >
+                        🚪 Đăng xuất
+                    </a>
+
+                </div>
+
+            </nav>
 
 
             <!-- ================= THÔNG BÁO PC ================= -->
@@ -538,24 +729,27 @@ function layout() {
                     class="user-info"
                     onclick="closeMobileMenu()"
                 >
+
                     <span class="user-name">
                         ${esc(
-                    user.fullName ||
-                    user.username ||
+                    user?.fullName ||
+                    user?.username ||
                     'Người dùng'
                     )}
                     </span>
 
                     <span class="user-role">
                         ${
-            user.role === 'ADMIN'
+            user?.role === 'ADMIN'
             ? 'Quản trị viên Wings Up'
-            : user.role === 'MANAGER'
+            : user?.role === 'MANAGER'
             ? 'Quản lý Wings Up'
             : 'Người dùng Wings Up'
             }
                     </span>
+
                 </a>
+
 
                 <a
                     href="#"
@@ -573,7 +767,30 @@ function layout() {
 
         </header>
 
+
         <main id="content"></main>
+
+
+        <!-- ================= BỘ ĐẾM TỰ ĐĂNG XUẤT ================= -->
+
+        <div
+            id="inactivityTimer"
+            style="
+                position:fixed;
+                right:20px;
+                bottom:20px;
+                z-index:9999;
+                background:#fff;
+                padding:10px 14px;
+                border-radius:10px;
+                box-shadow:0 4px 15px rgba(0,0,0,.15);
+                font-size:14px;
+                display:none;
+            "
+        >
+            ⏱️ Tự đăng xuất sau
+            <b id="logoutCountdown">60</b>s
+        </div>
 
     `;
 }
@@ -838,6 +1055,9 @@ async function doLogin() {
                 loginUser
                 );
 
+        // Bắt đầu đếm 1 phút không hoạt động
+        startInactivityLogout();
+
 
         location.hash = '#/';
 
@@ -902,6 +1122,7 @@ function showForgotPassword() {
                 >
                     Gửi mã OTP
                 </button>
+                <div id="otpStatus" class="otp-status"></div>
 
 
                 <div
@@ -990,31 +1211,68 @@ function showForgotPassword() {
 
     `;
 }
+let forgotOtpSending = false;
+let forgotOtpCooldown = false;
 
 async function sendForgotCode() {
-    const emailInput = document.getElementById("forgot_email");
-    if (!emailInput) {
-        alert("❌ Không tìm thấy ô nhập email!");
+
+    if (forgotOtpSending || forgotOtpCooldown) {
         return;
     }
 
-    const email = emailInput.value.trim().toLowerCase();
+    const emailInput =
+            document.getElementById("forgot_email");
+
+    const status =
+            document.getElementById("otpStatus");
+
+    const sendButton =
+            document.querySelector(
+                    'button[onclick="sendForgotCode()"]'
+                    );
+
+    if (!emailInput || !status) {
+        console.error("Không tìm thấy thành phần OTP!");
+        return;
+    }
+
+    const email =
+            emailInput.value.trim().toLowerCase();
+
     if (!email) {
-        alert("⚠️ Vui lòng nhập email tài khoản!");
+        status.className = "otp-status error";
+        status.innerText =
+                "⚠️ Vui lòng nhập email tài khoản!";
         emailInput.focus();
         return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex =
+            /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!emailRegex.test(email)) {
-        alert("⚠️ Email không đúng định dạng!");
+        status.className = "otp-status error";
+        status.innerText =
+                "⚠️ Email không đúng định dạng!";
         emailInput.focus();
         return;
     }
 
     try {
-        // Hiển thị đang gửi
-        alert("⏳ Đang gửi mã OTP...");
+
+        forgotOtpSending = true;
+
+        // Hiện TRỰC TIẾP TRÊN WEB
+        status.className =
+                "otp-status loading";
+
+        status.innerText =
+                "⏳ Đang gửi mã OTP...";
+
+        if (sendButton) {
+            sendButton.disabled = true;
+        }
+
         const result = await api(
                 "/auth/forgot-password",
                 "POST",
@@ -1022,24 +1280,90 @@ async function sendForgotCode() {
                     email: email
                 }
         );
-        console.log("Kết quả gửi OTP:", result);
+
+        console.log(
+                "Kết quả gửi OTP:",
+                result
+                );
+
+        // Gửi thành công
+        status.className =
+                "otp-status success";
+
+        status.innerText =
+                "✅ Mã OTP đã được gửi! " +
+                "Vui lòng kiểm tra email.";
+
         // Hiện form nhập OTP
-        const resetForm = document.getElementById("resetForm");
+        const resetForm =
+                document.getElementById("resetForm");
+
         if (resetForm) {
             resetForm.style.display = "block";
         }
 
-        alert(
-                "✅ Mã OTP đã được gửi!\n\n" +
-                "Vui lòng kiểm tra email:\n" +
-                email
-                );
+        // Khóa gửi lại 60 giây
+        forgotOtpCooldown = true;
+
+        let remaining = 60;
+
+        if (sendButton) {
+            sendButton.innerText =
+                    `Gửi lại OTP (${remaining}s)`;
+        }
+
+        const timer = setInterval(() => {
+
+            remaining--;
+
+            if (sendButton) {
+                sendButton.innerText =
+                        remaining > 0
+                        ? `Gửi lại OTP (${remaining}s)`
+                        : "Gửi mã OTP";
+            }
+
+            if (remaining <= 0) {
+
+                clearInterval(timer);
+
+                forgotOtpCooldown = false;
+
+                if (sendButton) {
+                    sendButton.disabled = false;
+                    sendButton.innerText =
+                            "Gửi mã OTP";
+                }
+            }
+
+        }, 1000);
+
     } catch (error) {
-        console.error("LỖI GỬI OTP:", error);
-        alert(
-                "❌ Không thể gửi mã OTP!\n\n" +
-                (error?.message || "Có lỗi xảy ra, vui lòng thử lại.")
+
+        console.error(
+                "Lỗi gửi OTP:",
+                error
                 );
+
+        status.className =
+                "otp-status error";
+
+        status.innerText =
+                "❌ " +
+                (
+                        error?.message ||
+                        "Không thể gửi mã OTP. Vui lòng thử lại."
+                        );
+
+        if (sendButton) {
+            sendButton.disabled = false;
+            sendButton.innerText =
+                    "Gửi mã OTP";
+        }
+
+    } finally {
+
+        forgotOtpSending = false;
     }
 }
 
@@ -1483,10 +1807,10 @@ async function pageDashboard() {
 
                 <span>
                     ${
-                    canViewAllTransactions
-                    ? 'Phiếu chờ duyệt'
-                    : 'Phiếu của tôi đang chờ'
-                    }
+                canViewAllTransactions
+                ? 'Phiếu chờ duyệt'
+                : 'Phiếu của tôi đang chờ'
+                }
                 </span>
 
                 <strong>
@@ -1508,9 +1832,9 @@ async function pageDashboard() {
 
 
             ${
-            d.lowStock.length
+                d.lowStock.length
 
-            ? `
+                ? `
 
                     <div class="table-wrap">
 
@@ -1579,14 +1903,14 @@ async function pageDashboard() {
 
                 `
 
-            : `
+                : `
 
                     <div class="empty">
                         Không có sản phẩm nào dưới mức tối thiểu.
                     </div>
 
                 `
-            }
+                }
 
         </div>
 
@@ -1607,9 +1931,9 @@ async function pageDashboard() {
 
 
             ${
-            d.recent.length
+                d.recent.length
 
-            ? `
+                ? `
 
                     <div class="table-wrap">
 
@@ -1718,14 +2042,14 @@ async function pageDashboard() {
 
                 `
 
-            : `
+                : `
 
                     <div class="empty">
                         Chưa có phiếu nào.
                     </div>
 
                 `
-            }
+                }
 
         </div>
 
