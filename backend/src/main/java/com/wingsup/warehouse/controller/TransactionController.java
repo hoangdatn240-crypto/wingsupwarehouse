@@ -1,3 +1,4 @@
+
 package com.wingsup.warehouse.controller;
 
 import com.wingsup.warehouse.model.*;
@@ -70,6 +71,8 @@ public class TransactionController {
      * ADMIN   → duyệt ngay + cập nhật tồn kho
      * MANAGER → PENDING
      * USER    → PENDING
+     *
+     * USER CHỈ ĐƯỢC TẠO PHIẾU XUẤT
      * =========================================================
      */
     @PostMapping
@@ -93,7 +96,25 @@ public class TransactionController {
         }
 
         /*
-         * USER chỉ được yêu cầu xuất tối đa 10 sản phẩm / phiếu
+         * =====================================================
+         * USER CHỈ ĐƯỢC XUẤT KHO
+         *
+         * Không cho phép USER gửi phiếu IN,
+         * kể cả gọi API trực tiếp.
+         * =====================================================
+         */
+        if (me.getRole() == Role.USER
+                && req.type() != TxType.OUT) {
+
+            throw new IllegalArgumentException(
+                    "Người dùng chỉ được tạo phiếu xuất kho."
+            );
+        }
+
+        /*
+         * =====================================================
+         * USER CHỈ ĐƯỢC YÊU CẦU XUẤT TỐI ĐA 10 SẢN PHẨM / PHIẾU
+         * =====================================================
          */
         if (me.getRole() == Role.USER
                 && req.type() == TxType.OUT
@@ -115,7 +136,9 @@ public class TransactionController {
                 );
 
         /*
-         * Kiểm tra tồn kho khi yêu cầu xuất
+         * =====================================================
+         * KIỂM TRA TỒN KHO KHI YÊU CẦU XUẤT
+         * =====================================================
          */
         if (req.type() == TxType.OUT
                 && p.getQuantity() < req.quantity()) {
@@ -128,7 +151,9 @@ public class TransactionController {
         }
 
         /*
-         * Tạo phiếu
+         * =====================================================
+         * TẠO PHIẾU
+         * =====================================================
          */
         StockTransaction t = new StockTransaction();
 
@@ -184,7 +209,9 @@ public class TransactionController {
         StockTransaction saved = repo.save(t);
 
         /*
-         * Thông báo cho ADMIN và MANAGER
+         * =====================================================
+         * THÔNG BÁO CHO ADMIN + MANAGER
+         * =====================================================
          */
         notifyManagers(
                 "🔔 Yêu cầu kho mới",

@@ -2788,15 +2788,17 @@ function prodDraw() {
 /* ================= Phiếu nhập/xuất ================= */
 
 let tx = {};
+
 async function pageTransactions() {
 
-    tx = {
+    const isUser = user?.role === 'USER';
 
+    tx = {
         items: [],
         products: [],
         form: {
             productId: '',
-            type: 'IN',
+            type: isUser ? 'OUT' : 'IN',
             quantity: 1,
             note: ''
         },
@@ -2805,6 +2807,7 @@ async function pageTransactions() {
         fromDate: '',
         toDate: ''
     };
+
     txLoad();
 }
 
@@ -3185,8 +3188,20 @@ function txFilterDate() {
 
 function txDraw() {
 
-    const f =
-            tx.form;
+    const f = tx.form;
+
+    /*
+     * =========================================================
+     * USER CHỈ ĐƯỢC XUẤT KHO
+     * Nếu dữ liệu cũ đang là IN thì tự chuyển về OUT
+     * =========================================================
+     */
+    const isUser = user?.role === 'USER';
+
+    if (isUser && f.type === 'IN') {
+        f.type = 'OUT';
+    }
+
     const filteredItems =
             tx.items.filter(t => {
 
@@ -3198,11 +3213,11 @@ function txDraw() {
                     return true;
                 }
 
-
                 const date =
                         new Date(
                                 t.createdAt
                                 );
+
                 if (
                         isNaN(
                                 date.getTime()
@@ -3211,7 +3226,6 @@ function txDraw() {
 
                     return false;
                 }
-
 
                 const itemDate =
                         date.getFullYear() +
@@ -3223,6 +3237,7 @@ function txDraw() {
                         String(
                                 date.getDate()
                                 ).padStart(2, '0');
+
                 if (
                         tx.fromDate &&
                         itemDate < tx.fromDate
@@ -3230,7 +3245,6 @@ function txDraw() {
 
                     return false;
                 }
-
 
                 if (
                         tx.toDate &&
@@ -3240,20 +3254,18 @@ function txDraw() {
                     return false;
                 }
 
-
                 return true;
             });
+
     draw(`
 
         <h1>
             Phiếu nhập/xuất kho
         </h1>
 
-
         ${err(tx.error)}
 
         ${okMsg(tx.success)}
-
 
         <div class="panel">
 
@@ -3261,9 +3273,7 @@ function txDraw() {
                 Tạo phiếu mới
             </h2>
 
-
             <div class="form">
-
 
                 <label>
 
@@ -3271,25 +3281,30 @@ function txDraw() {
 
                     <select id="t_type">
 
-                        <option
-                            value="IN"
-                            ${
-            f.type === 'IN'
-            ? 'selected'
-            : ''
-            }
-                        >
-                            Nhập kho
-                        </option>
-
+                        ${
+                        !isUser
+                        ? `
+                            <option
+                                value="IN"
+                                ${
+                                f.type === 'IN'
+                                ? 'selected'
+                                : ''
+                                }
+                            >
+                                Nhập kho
+                            </option>
+                        `
+                        : ''
+                        }
 
                         <option
                             value="OUT"
                             ${
-            f.type === 'OUT'
-            ? 'selected'
-            : ''
-            }
+                            f.type === 'OUT'
+                            ? 'selected'
+                            : ''
+                            }
                         >
                             Xuất kho
                         </option>
@@ -3297,7 +3312,6 @@ function txDraw() {
                     </select>
 
                 </label>
-
 
                 <label>
 
@@ -3311,17 +3325,16 @@ function txDraw() {
 
                         </option>
 
-
                         ${tx.products.map((p) => `
 
                             <option
                                 value="${p.id}"
                                 ${
-                        String(p.id) ===
-                        String(f.productId)
-                        ? 'selected'
-                        : ''
-                        }
+                                String(p.id) ===
+                                String(f.productId)
+                                ? 'selected'
+                                : ''
+                                }
                             >
 
                                 ID ${p.id} –
@@ -3336,7 +3349,6 @@ function txDraw() {
 
                 </label>
 
-
                 <label>
 
                     Số lượng
@@ -3350,7 +3362,6 @@ function txDraw() {
 
                 </label>
 
-
                 <label>
 
                     Ghi chú
@@ -3362,7 +3373,6 @@ function txDraw() {
 
                 </label>
 
-
                 <button
                     class="btn"
                     onclick="txCreate()"
@@ -3370,11 +3380,9 @@ function txDraw() {
                     Tạo phiếu
                 </button>
 
-
             </div>
 
         </div>
-
 
         <!-- LỌC LỊCH SỬ -->
 
@@ -3401,7 +3409,6 @@ function txDraw() {
 
             </label>
 
-
             <label style="margin:0;">
 
                 Đến ngày
@@ -3415,7 +3422,6 @@ function txDraw() {
 
             </label>
 
-
             <button
                 class="btn"
                 onclick="txFilterDate()"
@@ -3425,7 +3431,6 @@ function txDraw() {
             </button>
 
         </div>
-
 
         <!-- LỊCH SỬ PHIẾU -->
 
@@ -3464,7 +3469,6 @@ function txDraw() {
 
                         </thead>
 
-
                         <tbody>
 
                             ${filteredItems.map((t) => `
@@ -3475,7 +3479,6 @@ function txDraw() {
                                         ${dt(t.createdAt)}
                                     </td>
 
-
                                     <td>
 
                                         <span
@@ -3483,49 +3486,45 @@ function txDraw() {
                                         >
 
                                             ${
-                        t.type === 'IN'
-                        ? 'Nhập'
-                        : 'Xuất'
-                        }
+                                            t.type === 'IN'
+                                            ? 'Nhập'
+                                            : 'Xuất'
+                                            }
 
                                         </span>
 
                                     </td>
 
-
                                     <td>
 
                                         ${esc(
-                                t.product?.name ||
-                                'Sản phẩm đã xóa'
-                                )}
+                                        t.product?.name ||
+                                        'Sản phẩm đã xóa'
+                                        )}
 
                                     </td>
-
 
                                     <td class="num">
                                         ${t.quantity}
                                     </td>
 
-
                                     <td>
 
                                         ${esc(
-                        t.createdBy
-                        ? (
-                                t.createdBy.fullName ||
-                                t.createdBy.username
-                                )
-                        : ''
-                        )}
+                                        t.createdBy
+                                        ?
+                                        (
+                                            t.createdBy.fullName ||
+                                            t.createdBy.username
+                                        )
+                                        : ''
+                                        )}
 
                                     </td>
-
 
                                     <td>
                                         ${esc(t.note || '')}
                                     </td>
-
 
                                     <td>
 
@@ -3534,80 +3533,77 @@ function txDraw() {
                                         >
 
                                             ${
-                        STATUS[t.status] ||
-                        t.status
-                        }
+                                            STATUS[t.status] ||
+                                            t.status
+                                            }
 
                                         </span>
 
                                     </td>
-
 
                                     <td>
 
                                         <div class="actions">
 
                                             ${
-                        canManageWarehouse() &&
-                        t.status === 'PENDING'
+                                            canManageWarehouse() &&
+                                            t.status === 'PENDING'
 
-                        ? `
+                                            ? `
 
-                                                    <button
-                                                        class="
-                                                            btn
-                                                            ok
-                                                            small
-                                                        "
-                                                        onclick="
-                                                            txApprove(${t.id})
-                                                        "
-                                                    >
-                                                        Duyệt
-                                                    </button>
+                                                <button
+                                                    class="
+                                                        btn
+                                                        ok
+                                                        small
+                                                    "
+                                                    onclick="
+                                                        txApprove(${t.id})
+                                                    "
+                                                >
+                                                    Duyệt
+                                                </button>
 
+                                                <button
+                                                    class="
+                                                        btn
+                                                        danger
+                                                        small
+                                                    "
+                                                    onclick="
+                                                        txReject(${t.id})
+                                                    "
+                                                >
+                                                    Từ chối
+                                                </button>
 
-                                                    <button
-                                                        class="
-                                                            btn
-                                                            danger
-                                                            small
-                                                        "
-                                                        onclick="
-                                                            txReject(${t.id})
-                                                        "
-                                                    >
-                                                        Từ chối
-                                                    </button>
+                                            `
 
-                                                `
-
-                        : ''
-                        }
-
+                                            : ''
+                                            }
 
                                             ${
-                        txCanCancel(t)
+                                            txCanCancel(t)
 
-                        ? `
+                                            ? `
 
-                                                    <button
-                                                        class="
-                                                            btn
-                                                            ghost
-                                                            small
-                                                        "
-                                                        onclick="
-                                                            txCancel(${t.id})
-                                                        "
-                                                    >
-                                                        Hủy phiếu
-                                                    </button>
+                                                <button
+                                                    class="
+                                                        btn
+                                                        ghost
+                                                        small
+                                                    "
+                                                    onclick="
+                                                        txCancel(${t.id})
+                                                    "
+                                                >
+                                                    Hủy phiếu
+                                                </button>
 
-                                                `
+                                            `
 
-                        : ''
-                        }
+                                            : ''
+                                            }
 
                                         </div>
 
@@ -3628,13 +3624,13 @@ function txDraw() {
                     <div class="empty">
 
                         ${
-            tx.fromDate ||
-            tx.toDate
+                        tx.fromDate ||
+                        tx.toDate
 
-            ? 'Không có phiếu nào trong khoảng thời gian đã chọn.'
+                        ? 'Không có phiếu nào trong khoảng thời gian đã chọn.'
 
-            : 'Chưa có phiếu nào.'
-            }
+                        : 'Chưa có phiếu nào.'
+                        }
 
                     </div>
 
@@ -3645,6 +3641,7 @@ function txDraw() {
 
     `);
 }
+
 
 
 /* ================= Danh mục / Người dùng ================= */
