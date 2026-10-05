@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
@@ -113,6 +114,7 @@ public class AuthController {
     ) {
 
         System.out.println("========== LOGIN ==========");
+
         System.out.println(
                 "Username nhận được: "
                 + req.username()
@@ -190,6 +192,25 @@ public class AuthController {
             );
         }
 
+        /*
+         * =====================================================
+         * TẠO PHIÊN ĐĂNG NHẬP MỚI
+         *
+         * Mỗi lần đăng nhập:
+         * - Tạo sessionId mới
+         * - sessionId cũ bị vô hiệu hóa
+         * - Token cũ sẽ không còn hợp lệ
+         *
+         * Vì vậy:
+         * 1 tài khoản = 1 phiên đăng nhập
+         * =====================================================
+         */
+
+        String sessionId =
+                UUID.randomUUID().toString();
+
+        user.setSessionId(sessionId);
+
         user.setActive(true);
 
         user.setLastActiveAt(
@@ -198,12 +219,23 @@ public class AuthController {
 
         users.save(user);
 
+        /*
+         * Token được gắn với sessionId hiện tại
+         */
         String token =
-                tokens.create(user.getId());
+                tokens.create(
+                        user.getId(),
+                        sessionId
+                );
 
         System.out.println(
                 "LOGIN THÀNH CÔNG - User ID: "
                 + user.getId()
+        );
+
+        System.out.println(
+                "SESSION ID: "
+                + sessionId
         );
 
         return Map.of(
@@ -353,6 +385,11 @@ public class AuthController {
 
         user.setLastActiveAt(null);
 
+        /*
+         * Chưa có phiên đăng nhập
+         */
+        user.setSessionId(null);
+
         users.save(user);
 
         return Map.of(
@@ -371,12 +408,20 @@ public class AuthController {
             @RequestAttribute("user") AppUser me
     ) {
 
+        /*
+         * Xóa phiên đăng nhập hiện tại
+         */
+        me.setSessionId(null);
+
         me.setActive(false);
 
         me.setLastActiveAt(null);
 
         users.save(me);
 
+        /*
+         * Xóa token hiện tại khỏi TokenStore
+         */
         tokens.remove(
                 AuthInterceptor.extractToken(req)
         );
@@ -507,25 +552,13 @@ public class AuthController {
         LocalDateTime now =
                 LocalDateTime.now();
 
-        /*
-         * =====================================================
-         * LẤY OTP CŨ
-         * =====================================================
-         */
         OtpData oldOtp =
                 otpStore.get(email);
 
-        /*
-         * =====================================================
-         * NẾU EMAIL ĐÃ TỪNG YÊU CẦU OTP
-         * =====================================================
-         */
         if (oldOtp != null) {
 
             /*
-             * -------------------------------------------------
-             * 1. CHẶN GỬI LIÊN TỤC
-             * -------------------------------------------------
+             * Chặn gửi liên tục
              */
             if (oldOtp.lastSentAt() != null) {
 
@@ -549,9 +582,7 @@ public class AuthController {
             }
 
             /*
-             * -------------------------------------------------
-             * 2. KIỂM TRA CỬA SỔ 15 PHÚT
-             * -------------------------------------------------
+             * Kiểm tra cửa sổ 15 phút
              */
             LocalDateTime windowStart =
                     oldOtp.windowStartedAt();
@@ -559,10 +590,6 @@ public class AuthController {
             int sendCount =
                     oldOtp.sendCount();
 
-            /*
-             * Nếu đã qua 15 phút
-             * → reset bộ đếm
-             */
             if (windowStart == null
                     || Duration.between(
                             windowStart,
@@ -574,9 +601,7 @@ public class AuthController {
             }
 
             /*
-             * -------------------------------------------------
-             * 3. TỐI ĐA 5 LẦN / 15 PHÚT
-             * -------------------------------------------------
+             * Tối đa 5 lần / 15 phút
              */
             if (sendCount >= 5) {
 
@@ -601,11 +626,6 @@ public class AuthController {
                 );
             }
 
-            /*
-             * -------------------------------------------------
-             * 4. TẠO OTP MỚI
-             * -------------------------------------------------
-             */
             String code =
                     String.format(
                             "%06d",
@@ -615,15 +635,6 @@ public class AuthController {
             LocalDateTime expiresAt =
                     now.plusMinutes(5);
 
-            /*
-             * -------------------------------------------------
-             * 5. GỬI EMAIL TRƯỚC
-             *
-             * Nếu gửi thất bại:
-             * → không tăng sendCount
-             * → OTP cũ vẫn còn
-             * -------------------------------------------------
-             */
             try {
 
                 sendOtpEmail(
@@ -639,11 +650,6 @@ public class AuthController {
                 );
             }
 
-            /*
-             * -------------------------------------------------
-             * 6. CHỈ LƯU OTP SAU KHI GỬI EMAIL THÀNH CÔNG
-             * -------------------------------------------------
-             */
             sendCount++;
 
             otpStore.put(
@@ -664,11 +670,8 @@ public class AuthController {
         }
 
         /*
-         * =====================================================
-         * LẦN ĐẦU YÊU CẦU OTP
-         * =====================================================
+         * Lần đầu yêu cầu OTP
          */
-
         String code =
                 String.format(
                         "%06d",
@@ -678,9 +681,6 @@ public class AuthController {
         LocalDateTime expiresAt =
                 now.plusMinutes(5);
 
-        /*
-         * Gửi email trước
-         */
         try {
 
             sendOtpEmail(
@@ -696,10 +696,6 @@ public class AuthController {
             );
         }
 
-        /*
-         * Email gửi thành công
-         * → lưu OTP
-         */
         otpStore.put(
                 email,
                 new OtpData(
@@ -809,9 +805,6 @@ public class AuthController {
         String code =
                 req.code().trim();
 
-        /*
-         * OTP phải đúng 6 số
-         */
         if (!code.matches("\\d{6}")) {
 
             throw new IllegalArgumentException(
@@ -819,16 +812,10 @@ public class AuthController {
             );
         }
 
-        /*
-         * Kiểm tra mật khẩu mới
-         */
         validatePassword(
                 req.newPassword()
         );
 
-        /*
-         * Lấy OTP
-         */
         OtpData otp =
                 otpStore.get(email);
 
@@ -839,9 +826,6 @@ public class AuthController {
             );
         }
 
-        /*
-         * Kiểm tra hết hạn
-         */
         if (LocalDateTime.now()
                 .isAfter(otp.expiresAt())) {
 
@@ -852,9 +836,6 @@ public class AuthController {
             );
         }
 
-        /*
-         * Kiểm tra OTP
-         */
         if (!otp.code().equals(code)) {
 
             throw new IllegalArgumentException(
@@ -862,9 +843,6 @@ public class AuthController {
             );
         }
 
-        /*
-         * Tìm user
-         */
         AppUser user =
                 users.findByEmail(email)
                         .orElseThrow(() ->
@@ -873,9 +851,6 @@ public class AuthController {
                                 )
                         );
 
-        /*
-         * Không cho dùng lại mật khẩu cũ
-         */
         if (encoder.matches(
                 req.newPassword(),
                 user.getPassword()
@@ -886,20 +861,26 @@ public class AuthController {
             );
         }
 
-        /*
-         * Đặt mật khẩu mới
-         */
         user.setPassword(
                 encoder.encode(
                         req.newPassword()
                 )
         );
 
+        /*
+         * =====================================================
+         * RESET PASSWORD = HỦY PHIÊN ĐĂNG NHẬP CŨ
+         *
+         * Nếu tài khoản đang đăng nhập ở trình duyệt khác,
+         * sau khi reset mật khẩu phiên đó sẽ bị đăng xuất.
+         * =====================================================
+         */
+        user.setSessionId(null);
+        user.setActive(false);
+        user.setLastActiveAt(null);
+
         users.save(user);
 
-        /*
-         * Xóa OTP sau khi sử dụng thành công
-         */
         otpStore.remove(email);
 
         return Map.of(

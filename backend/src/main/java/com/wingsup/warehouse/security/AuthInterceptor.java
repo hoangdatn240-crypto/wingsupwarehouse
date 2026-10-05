@@ -40,29 +40,75 @@ public class AuthInterceptor implements HandlerInterceptor {
             Object handler
     ) throws IOException {
 
-        // Cho phép OPTIONS
+        // Cho phép OPTIONS / CORS
         if (HttpMethod.OPTIONS.matches(req.getMethod())) {
             return true;
         }
 
-        // Lấy user từ token
-        Long userId = tokens.get(extractToken(req));
+        /*
+         * =========================
+         * LẤY TOKEN
+         * =========================
+         */
+        String token = extractToken(req);
+
+        Long userId = tokens.get(token);
 
         AppUser user = userId == null
                 ? null
                 : users.findById(userId).orElse(null);
 
-        // Chưa đăng nhập hoặc tài khoản không hoạt động
+        /*
+         * =========================
+         * KIỂM TRA ĐĂNG NHẬP
+         * =========================
+         */
         if (user == null || !user.isActive()) {
+
             error(
                     res,
                     401,
                     "Chưa đăng nhập hoặc phiên đã hết hạn"
             );
+
             return false;
         }
 
-        // Gửi user cho Controller
+        /*
+         * =========================
+         * KIỂM TRA SESSION
+         * =========================
+         *
+         * Mỗi tài khoản chỉ được có
+         * 1 phiên đăng nhập.
+         *
+         * Khi đăng nhập ở trình duyệt
+         * hoặc thiết bị khác:
+         *
+         * sessionId trong DB sẽ được
+         * thay bằng sessionId mới.
+         *
+         * Token cũ sẽ không còn hợp lệ.
+         */
+        String tokenSession = tokens.getSessionId(token);
+        String currentSession = user.getSessionId();
+
+        if (currentSession == null
+                || tokenSession == null
+                || !currentSession.equals(tokenSession)) {
+
+            error(
+                    res,
+                    401,
+                    "Tài khoản đã được đăng nhập trên thiết bị hoặc trình duyệt khác"
+            );
+
+            return false;
+        }
+
+        /*
+         * Gửi user cho Controller
+         */
         req.setAttribute("user", user);
 
         /*
@@ -84,7 +130,7 @@ public class AuthInterceptor implements HandlerInterceptor {
          * MANAGER được sử dụng toàn bộ
          * chức năng quản lý kho.
          *
-         * Ngoại lệ duy nhất:
+         * Ngoại lệ:
          * Không được truy cập /api/users
          */
         if (user.getRole() == Role.MANAGER) {
@@ -100,7 +146,6 @@ public class AuthInterceptor implements HandlerInterceptor {
                 return false;
             }
 
-            // Các API khác MANAGER được phép
             return true;
         }
 
@@ -130,7 +175,11 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // Role không hợp lệ
+        /*
+         * =========================
+         * ROLE KHÔNG HỢP LỆ
+         * =========================
+         */
         error(
                 res,
                 403,
@@ -176,18 +225,19 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         /*
-    * USER chỉ được xem:
-    *
-    * - Sản phẩm
-    * - Danh mục
-    *
-    * Không được thêm / sửa / xóa.
+         * USER chỉ được xem:
+         *
+         * - Sản phẩm
+         * - Danh mục
+         *
+         * Không được thêm / sửa / xóa.
          */
         if (path.startsWith("/api/products")
                 || path.startsWith("/api/categories")) {
 
             return !read;
         }
+
         /*
          * Các API khác USER được phép
          * theo Controller hiện tại.

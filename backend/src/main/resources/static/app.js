@@ -264,12 +264,12 @@ function clearSession() {
 
 
 /* ================= API ================= */
-
 async function api(path, method = 'GET', body) {
 
     const headers = {
         'Content-Type': 'application/json'
     };
+
     if (token) {
         headers.Authorization = 'Bearer ' + token;
     }
@@ -281,22 +281,43 @@ async function api(path, method = 'GET', body) {
                 ? JSON.stringify(body)
                 : undefined
     });
+
     const text = await res.text();
+
     let data = null;
+
     try {
         data = text ? JSON.parse(text) : null;
     } catch (e) {
         data = null;
     }
 
+    /*
+     * =========================
+     * PHIÊN BỊ ĐĂNG NHẬP NƠI KHÁC
+     * =========================
+     */
     if (res.status === 401 && path !== '/auth/login') {
 
+        const message =
+                (data && data.message)
+                || 'Tài khoản đã được đăng nhập ở thiết bị hoặc trình duyệt khác.';
+
         clearSession();
+
+        alert('⚠️ ' + message);
+
         location.hash = '#/login';
         render();
-        throw new Error('Phiên đăng nhập đã hết hạn');
+
+        throw new Error(message);
     }
 
+    /*
+     * =========================
+     * CÁC LỖI KHÁC
+     * =========================
+     */
     if (!res.ok) {
 
         throw new Error(
@@ -304,11 +325,14 @@ async function api(path, method = 'GET', body) {
                 || (data && data.detail)
                 || text
                 || 'Có lỗi xảy ra (' + res.status + ')'
-                );
+        );
     }
 
     return data;
 }
+
+
+
 
 
 /* ================= Thông báo ================= */

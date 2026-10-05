@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 import jakarta.persistence.Column;
 import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -39,6 +40,9 @@ public class AppUser {
 
     @Column(name = "last_active_at")
     private LocalDateTime lastActiveAt;
+
+    @Column(name = "session_id")
+    private String sessionId;
 
     private boolean active = false;
 }
