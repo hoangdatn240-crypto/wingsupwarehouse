@@ -325,7 +325,7 @@ async function api(path, method = 'GET', body) {
                 || (data && data.detail)
                 || text
                 || 'Có lỗi xảy ra (' + res.status + ')'
-        );
+                );
     }
 
     return data;
@@ -2985,6 +2985,105 @@ async function txLoad() {
 }
 
 
+function txExportExcel() {
+
+    // Kiểm tra thư viện Excel
+    if (typeof XLSX === 'undefined') {
+        alert(
+                'Chưa tải được thư viện Excel. ' +
+                'Hãy kiểm tra kết nối Internet và tải lại trang.'
+                );
+        return;
+    }
+
+    // Lọc dữ liệu giống bảng lịch sử
+    const filteredItems = tx.items.filter(t => {
+
+        if (!tx.fromDate && !tx.toDate) {
+            return true;
+        }
+
+        const date = new Date(t.createdAt);
+
+        if (isNaN(date.getTime())) {
+            return false;
+        }
+
+        const itemDate =
+                date.getFullYear() + '-' +
+                String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                String(date.getDate()).padStart(2, '0');
+
+        if (tx.fromDate && itemDate < tx.fromDate) {
+            return false;
+        }
+
+        if (tx.toDate && itemDate > tx.toDate) {
+            return false;
+        }
+
+        return true;
+    });
+
+    if (filteredItems.length === 0) {
+        alert('Không có phiếu nào để xuất Excel.');
+        return;
+    }
+
+    // Chuẩn bị dữ liệu Excel
+    const rows = filteredItems.map(t => ({
+            'Mã phiếu': t.id,
+            'Thời gian': t.createdAt
+                    ? new Date(t.createdAt).toLocaleString('vi-VN')
+                    : '',
+            'Loại phiếu': t.type === 'IN' ? 'Nhập kho' : 'Xuất kho',
+            'Sản phẩm': t.product?.name || 'Sản phẩm đã xóa',
+            'Số lượng': t.quantity,
+            'Người tạo': t.createdBy
+                    ? (t.createdBy.fullName || t.createdBy.username || '')
+                    : '',
+            'Ghi chú': t.note || '',
+            'Trạng thái': STATUS[t.status] || t.status || ''
+        }));
+
+    // Tạo file Excel
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+
+    // Tự động điều chỉnh độ rộng cột
+    worksheet['!cols'] = [
+        {wch: 12},
+        {wch: 22},
+        {wch: 15},
+        {wch: 30},
+        {wch: 12},
+        {wch: 25},
+        {wch: 35},
+        {wch: 18}
+    ];
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+            workbook,
+            worksheet,
+            'Phieu nhap xuat'
+            );
+
+    // Tên file có ngày xuất
+    const today = new Date();
+    const dateText =
+            today.getFullYear() +
+            String(today.getMonth() + 1).padStart(2, '0') +
+            String(today.getDate()).padStart(2, '0');
+
+    XLSX.writeFile(
+            workbook,
+            'WingsUp_PhieuNhapXuat_' + dateText + '.xlsx'
+            );
+}
+
+
+
 /* ================= Tạo phiếu ================= */
 
 async function txCreate() {
@@ -3091,6 +3190,102 @@ async function txCreate() {
         txDraw();
     }
 }
+
+
+
+async function txCreateAndExportExcel() {
+    // Lưu ID các phiếu cũ
+    const oldIds = new Set(
+        (tx.items || []).map(t => String(t.id))
+    );
+
+    // Tạo phiếu
+    await txCreate();
+
+    // Nếu tạo phiếu thất bại thì không xuất Excel
+    if (tx.error || !tx.success) {
+        return;
+    }
+
+    // Tìm phiếu mới được tạo
+    const newTransaction = (tx.items || []).find(
+        t => !oldIds.has(String(t.id))
+    );
+
+    if (!newTransaction) {
+        tx.error =
+            'Phiếu đã tạo nhưng không tìm thấy dữ liệu để xuất Excel.';
+        txDraw();
+        return;
+    }
+
+    // Kiểm tra thư viện Excel
+    if (typeof XLSX === 'undefined') {
+        tx.error =
+            'Chưa tải thư viện Excel. Vui lòng kiểm tra index.html.';
+        txDraw();
+        return;
+    }
+
+    const t = newTransaction;
+
+    // Chuyển trạng thái sang tiếng Việt
+    const statusText = {
+        PENDING: 'Chờ duyệt',
+        APPROVED: 'Đã duyệt',
+        REJECTED: 'Từ chối'
+    };
+
+    // Dữ liệu xuất Excel
+    const data = [{
+        'Mã phiếu': t.id ?? '',
+        'Ngày tạo': t.createdAt
+            ? new Date(t.createdAt).toLocaleString('vi-VN')
+            : '',
+        'Loại phiếu': t.type === 'IN'
+            ? 'Nhập kho'
+            : 'Xuất kho',
+        'Sản phẩm': t.product?.name
+            ?? t.productName
+            ?? '',
+        'Số lượng': t.quantity ?? '',
+        'Người tạo': t.createdBy?.fullName
+            ?? t.createdBy?.username
+            ?? t.createdByName
+            ?? '',
+        'Ghi chú': t.note ?? '',
+        'Trạng thái': statusText[t.status] ?? t.status ?? ''
+    }];
+
+    // Tạo file Excel
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        'Phieu kho'
+    );
+
+    // Đặt độ rộng cột
+    worksheet['!cols'] = [
+        { wch: 12 },
+        { wch: 22 },
+        { wch: 15 },
+        { wch: 25 },
+        { wch: 12 },
+        { wch: 22 },
+        { wch: 30 },
+        { wch: 18 }
+    ];
+
+    XLSX.writeFile(
+        workbook,
+        `phieu-kho-${t.id ?? 'moi'}.xlsx`
+    );
+}
+
+
 
 
 /* ================= Duyệt / Từ chối / Hủy ================= */
@@ -3282,29 +3477,29 @@ function txDraw() {
                     <select id="t_type">
 
                         ${
-                        !isUser
-                        ? `
+            !isUser
+            ? `
                             <option
                                 value="IN"
                                 ${
-                                f.type === 'IN'
-                                ? 'selected'
-                                : ''
-                                }
+            f.type === 'IN'
+            ? 'selected'
+            : ''
+            }
                             >
                                 Nhập kho
                             </option>
                         `
-                        : ''
-                        }
+            : ''
+            }
 
                         <option
                             value="OUT"
                             ${
-                            f.type === 'OUT'
-                            ? 'selected'
-                            : ''
-                            }
+            f.type === 'OUT'
+            ? 'selected'
+            : ''
+            }
                         >
                             Xuất kho
                         </option>
@@ -3330,11 +3525,11 @@ function txDraw() {
                             <option
                                 value="${p.id}"
                                 ${
-                                String(p.id) ===
-                                String(f.productId)
-                                ? 'selected'
-                                : ''
-                                }
+                        String(p.id) ===
+                        String(f.productId)
+                        ? 'selected'
+                        : ''
+                        }
                             >
 
                                 ID ${p.id} –
@@ -3373,12 +3568,25 @@ function txDraw() {
 
                 </label>
 
-                <button
-                    class="btn"
-                    onclick="txCreate()"
-                >
-                    Tạo phiếu
-                </button>
+                
+<div style="display:flex; gap:10px; flex-wrap:wrap;">
+
+    <button
+        class="btn"
+        onclick="txCreate()"
+    >
+        Tạo phiếu
+    </button>
+
+    <button
+        class="btn ok"
+        onclick="txCreateAndExportExcel()"
+    >
+        📊 Tạo phiếu và Xuất Excel
+    </button>
+
+</div>
+
 
             </div>
 
@@ -3428,6 +3636,14 @@ function txDraw() {
                 style="height:38px;"
             >
                 🔍 Lọc
+            </button>
+    
+            <button
+                class="btn ok"
+                onclick="txExportExcel()"
+                style="height:38px;"
+            >
+                📊 Xuất Excel
             </button>
 
         </div>
@@ -3486,10 +3702,10 @@ function txDraw() {
                                         >
 
                                             ${
-                                            t.type === 'IN'
-                                            ? 'Nhập'
-                                            : 'Xuất'
-                                            }
+                        t.type === 'IN'
+                        ? 'Nhập'
+                        : 'Xuất'
+                        }
 
                                         </span>
 
@@ -3498,9 +3714,9 @@ function txDraw() {
                                     <td>
 
                                         ${esc(
-                                        t.product?.name ||
-                                        'Sản phẩm đã xóa'
-                                        )}
+                                t.product?.name ||
+                                'Sản phẩm đã xóa'
+                                )}
 
                                     </td>
 
@@ -3511,14 +3727,14 @@ function txDraw() {
                                     <td>
 
                                         ${esc(
-                                        t.createdBy
-                                        ?
-                                        (
-                                            t.createdBy.fullName ||
-                                            t.createdBy.username
-                                        )
-                                        : ''
-                                        )}
+                        t.createdBy
+                        ?
+                        (
+                                t.createdBy.fullName ||
+                                t.createdBy.username
+                                )
+                        : ''
+                        )}
 
                                     </td>
 
@@ -3533,9 +3749,9 @@ function txDraw() {
                                         >
 
                                             ${
-                                            STATUS[t.status] ||
-                                            t.status
-                                            }
+                        STATUS[t.status] ||
+                        t.status
+                        }
 
                                         </span>
 
@@ -3546,10 +3762,10 @@ function txDraw() {
                                         <div class="actions">
 
                                             ${
-                                            canManageWarehouse() &&
-                                            t.status === 'PENDING'
+                        canManageWarehouse() &&
+                        t.status === 'PENDING'
 
-                                            ? `
+                        ? `
 
                                                 <button
                                                     class="
@@ -3579,13 +3795,13 @@ function txDraw() {
 
                                             `
 
-                                            : ''
-                                            }
+                        : ''
+                        }
 
                                             ${
-                                            txCanCancel(t)
+                        txCanCancel(t)
 
-                                            ? `
+                        ? `
 
                                                 <button
                                                     class="
@@ -3602,8 +3818,8 @@ function txDraw() {
 
                                             `
 
-                                            : ''
-                                            }
+                        : ''
+                        }
 
                                         </div>
 
@@ -3624,13 +3840,13 @@ function txDraw() {
                     <div class="empty">
 
                         ${
-                        tx.fromDate ||
-                        tx.toDate
+            tx.fromDate ||
+            tx.toDate
 
-                        ? 'Không có phiếu nào trong khoảng thời gian đã chọn.'
+            ? 'Không có phiếu nào trong khoảng thời gian đã chọn.'
 
-                        : 'Chưa có phiếu nào.'
-                        }
+            : 'Chưa có phiếu nào.'
+            }
 
                     </div>
 
