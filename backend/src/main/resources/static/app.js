@@ -588,6 +588,7 @@ setInterval(async () => {
 }, 30000);
 /* ================= Khung trang & điều hướng ================= */
 
+
 function layout() {
 
     const links = [
@@ -601,28 +602,23 @@ function layout() {
     /* ADMIN và MANAGER được dùng Danh mục */
 
     if (
-            isAdmin() ||
-            user?.role === 'MANAGER'
-            ) {
-
+        isAdmin() ||
+        user?.role === 'MANAGER'
+    ) {
         links.push(
-                ['#/categories', '🗂️ Danh mục']
-                );
+            ['#/categories', '🗂️ Danh mục']
+        );
     }
-
 
     /* Chỉ ADMIN được thấy Người dùng */
 
     if (isAdmin()) {
-
         links.push(
-                ['#/users', '👥 Người dùng']
-                );
+            ['#/users', '👥 Người dùng']
+        );
     }
 
-
-    const here =
-            location.hash || '#/';
+    const here = location.hash || '#/';
 
     document.getElementById('app').innerHTML = `
 
@@ -632,10 +628,13 @@ function layout() {
                 href="#/"
                 class="brand"
                 onclick="closeMobileMenu()"
+                aria-label="Wings Up - Trang chủ"
             >
-                Wings <b>Up</b> · Kho
+                <span class="brand-name">Wings <b>Up</b></span>
+                <span class="brand-subtitle">WAREHOUSE MANAGEMENT</span>
             </a>
 
+            <div class="sidebar-workspace-label">KHÔNG GIAN LÀM VIỆC</div>
 
             <!-- NÚT 3 GẠCH - MOBILE -->
 
@@ -648,26 +647,21 @@ function layout() {
                 ☰
             </button>
 
+            <!-- MENU ĐIỀU HƯỚNG -->
 
-            <!-- MENU -->
-
-            <nav
-                class="nav"
-                id="mainNav"
-            >
+            <nav class="nav" id="mainNav" aria-label="Điều hướng chính">
 
                 ${links.map(([h, t]) =>
-            `<a
+                    `<a
                         href="${h}"
                         class="${here === h ? 'active' : ''}"
                         onclick="closeMobileMenu()"
                     >
                         ${t}
                     </a>`
-    ).join('')}
+                ).join('')}
 
-
-                <!-- THÔNG BÁO TRONG MENU 3 GẠCH -->
+                <!-- THÔNG BÁO TRONG MENU MOBILE -->
 
                 <a
                     href="#/notifications"
@@ -678,8 +672,7 @@ function layout() {
                     <span id="notificationBadgeMobile"></span>
                 </a>
 
-
-                <!-- TÀI KHOẢN + ĐĂNG XUẤT TRONG MENU 3 GẠCH -->
+                <!-- TÀI KHOẢN MOBILE -->
 
                 <div class="mobile-account">
 
@@ -688,27 +681,24 @@ function layout() {
                         class="mobile-user-info"
                         onclick="closeMobileMenu()"
                     >
-
                         <span class="mobile-user-name">
                             ${esc(
-            user?.fullName ||
-            user?.username ||
-            'Người dùng'
-            )}
+                                user?.fullName ||
+                                user?.username ||
+                                'Người dùng'
+                            )}
                         </span>
 
                         <span class="mobile-user-role">
                             ${
-            user?.role === 'ADMIN'
-            ? 'Quản trị viên Wings Up'
-            : user?.role === 'MANAGER'
-            ? 'Quản lý Wings Up'
-            : 'Người dùng Wings Up'
-            }
+                                user?.role === 'ADMIN'
+                                ? 'Quản trị viên Wings Up'
+                                : user?.role === 'MANAGER'
+                                ? 'Quản lý Wings Up'
+                                : 'Người dùng Wings Up'
+                            }
                         </span>
-
                     </a>
-
 
                     <a
                         href="#"
@@ -726,25 +716,16 @@ function layout() {
 
             </nav>
 
-
-            <!-- ================= THÔNG BÁO PC ================= -->
+            <!-- THÔNG BÁO PC -->
 
             <div class="notification-box">
-
-                <a
-                    href="#/notifications"
-                >
-
+                <a href="#/notifications">
                     🔔 Thông báo
-
                     <span id="notificationBadge"></span>
-
                 </a>
-
             </div>
 
-
-            <!-- ================= TÀI KHOẢN ================= -->
+            <!-- TÀI KHOẢN PC -->
 
             <div class="who">
 
@@ -753,27 +734,24 @@ function layout() {
                     class="user-info"
                     onclick="closeMobileMenu()"
                 >
-
                     <span class="user-name">
                         ${esc(
-                    user?.fullName ||
-                    user?.username ||
-                    'Người dùng'
-                    )}
+                            user?.fullName ||
+                            user?.username ||
+                            'Người dùng'
+                        )}
                     </span>
 
                     <span class="user-role">
                         ${
-            user?.role === 'ADMIN'
-            ? 'Quản trị viên Wings Up'
-            : user?.role === 'MANAGER'
-            ? 'Quản lý Wings Up'
-            : 'Người dùng Wings Up'
-            }
+                            user?.role === 'ADMIN'
+                            ? 'Quản trị viên Wings Up'
+                            : user?.role === 'MANAGER'
+                            ? 'Quản lý Wings Up'
+                            : 'Người dùng Wings Up'
+                        }
                     </span>
-
                 </a>
-
 
                 <a
                     href="#"
@@ -791,11 +769,34 @@ function layout() {
 
         </header>
 
+        <div class="workspace-topbar">
+            <div class="workspace-context">
+                <span class="workspace-eyebrow">WORKSPACE / WINGS UP</span>
+                <strong>${esc(({
+                    '': 'Tổng quan',
+                    products: 'Sản phẩm',
+                    transactions: 'Phiếu nhập / xuất',
+                    lectures: 'Bài giảng',
+                    'special-requests': 'Yêu cầu đặc biệt',
+                    categories: 'Danh mục',
+                    users: 'Người dùng',
+                    notifications: 'Thông báo',
+                    profile: 'Hồ sơ cá nhân'
+                })[(location.hash || '#/').slice(2)] || 'Quản lý dữ liệu')}</strong>
+            </div>
+            <div class="workspace-topbar-right">
+                <span class="workspace-status"><i></i> Hệ thống hoạt động</span>
+                <span class="workspace-avatar">${esc((user?.fullName || user?.username || 'WU').trim().charAt(0).toUpperCase())}</span>
+                <span class="workspace-user">
+                    <strong>${esc(user?.fullName || user?.username || 'Người dùng')}</strong>
+                    <small>${user?.role === 'ADMIN' ? 'Quản trị viên' : user?.role === 'MANAGER' ? 'Quản lý kho' : 'Người dùng'}</small>
+                </span>
+            </div>
+        </div>
 
         <main id="content"></main>
 
-
-        <!-- ================= BỘ ĐẾM TỰ ĐĂNG XUẤT ================= -->
+        <!-- BỘ ĐẾM TỰ ĐĂNG XUẤT -->
 
         <div
             id="inactivityTimer"
@@ -818,6 +819,7 @@ function layout() {
 
     `;
 }
+
 /* ================= MENU MOBILE ================= */
 
 function toggleMobileMenu() {
@@ -848,56 +850,72 @@ function closeMobileMenu() {
 
 /* ================= Render ================= */
 
+
 async function render() {
 
     if (!token) {
         return pageLogin();
     }
 
-
     const route =
-            (location.hash || '#/')
-            .slice(2);
+        (location.hash || '#/')
+        .slice(2);
+
+    const pageTitles = {
+        '': 'Tổng quan',
+        products: 'Sản phẩm',
+        transactions: 'Phiếu nhập/xuất',
+        lectures: 'Bài giảng',
+        'special-requests': 'Yêu cầu đặc biệt',
+        categories: 'Danh mục',
+        users: 'Người dùng',
+        notifications: 'Thông báo',
+        profile: 'Hồ sơ cá nhân'
+    };
+    document.title = `${pageTitles[route] || 'Quản lý dữ liệu'} | Wings Up`;
+
     /*
      * Chỉ ADMIN được vào trang Người dùng
      */
-
     if (
-            route === 'users' &&
-            !isAdmin()
-            ) {
-
+        route === 'users' &&
+        !isAdmin()
+    ) {
         location.hash = '#/';
         return;
     }
-
 
     /*
      * ADMIN và MANAGER được vào Danh mục
      */
-
     if (
-            route === 'categories' &&
-            !(isAdmin() || user?.role === 'MANAGER')
-            ) {
-
+        route === 'categories' &&
+        !(isAdmin() || user?.role === 'MANAGER')
+    ) {
         location.hash = '#/';
         return;
     }
 
-
     layout();
+
+    /*
+     * Các trang CRUD hiện có
+     */
     if (CRUD[route]) {
         return pageCrud(route);
     }
 
-
+    /*
+     * Điều hướng các trang
+     */
     switch (route) {
 
         case 'products':
             return pageProducts();
+
         case 'transactions':
             return pageTransactions();
+
         case 'lectures':
             return pageLectures();
 
@@ -909,10 +927,12 @@ async function render() {
 
         case 'profile':
             return pageProfile();
+
         default:
             return pageDashboard();
     }
 }
+
 
 
 /* ================= Đăng nhập / Đăng ký ================= */
@@ -1734,6 +1754,80 @@ async function pageDashboard() {
                 user?.username ||
                 'bạn';
 
+        // Trang chủ riêng cho USER; không thay đổi dashboard ADMIN/MANAGER.
+        if (user?.role === 'USER') {
+            let ownTransactions = [];
+            try {
+                ownTransactions = await api('/transactions');
+                if (!Array.isArray(ownTransactions)) ownTransactions = [];
+            } catch (e) {
+                console.warn('Không tải được thống kê phiếu xuất:', e);
+            }
+
+            const outgoing = ownTransactions.filter(t => String(t.type || '').toUpperCase() === 'OUT');
+            const pendingOutgoing = outgoing.filter(t => String(t.status || '').toUpperCase() === 'PENDING').length;
+            const approvedOutgoing = outgoing.filter(t => String(t.status || '').toUpperCase() === 'APPROVED').length;
+            const recentOutgoing = outgoing.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5);
+
+            draw(`
+                <section class="user-home">
+                    <div class="user-home-hero">
+                        <div class="user-home-hero-copy">
+                            <span class="user-home-eyebrow">WINGS UP · EDU SUCCESS</span>
+                            <h1>Xin chào, ${esc(welcomeName)}! <span>👋</span></h1>
+                            <p>Chào mừng bạn quay lại. Theo dõi sản phẩm và quản lý các phiếu xuất kho của mình tại đây.</p>
+                            <div class="user-home-actions">
+                                <a class="user-home-primary" href="#/transactions">＋ Tạo phiếu xuất</a>
+                                <a class="user-home-secondary" href="#/products">Xem sản phẩm <span>→</span></a>
+                            </div>
+                        </div>
+                        <div class="user-home-hero-art" aria-hidden="true"><div class="user-home-art-box">📦</div><span class="user-home-art-dot dot-one"></span><span class="user-home-art-dot dot-two"></span></div>
+                    </div>
+
+                    <div class="user-home-section-heading">
+                        <div><span class="user-home-kicker">TỔNG QUAN CỦA BẠN</span><h2>Thống kê nhanh</h2></div>
+                        <span class="user-home-live"><i></i> Dữ liệu hệ thống</span>
+                    </div>
+                    <div class="user-home-stats">
+                        <a href="#/products" class="user-home-stat">
+                            <span class="user-home-stat-icon blue">▦</span><span class="user-home-stat-label">Loại sản phẩm</span>
+                            <strong>${Number(d.totalProducts || 0).toLocaleString('vi-VN')}</strong><small>Sản phẩm hiện có trong kho</small>
+                        </a>
+                        <a href="#/products" class="user-home-stat">
+                            <span class="user-home-stat-icon cyan">📦</span><span class="user-home-stat-label">Tổng lượng tồn</span>
+                            <strong>${Number(d.totalQuantity || 0).toLocaleString('vi-VN')}</strong><small>Đơn vị hàng hóa trong kho</small>
+                        </a>
+                        <a href="#/transactions" class="user-home-stat">
+                            <span class="user-home-stat-icon violet">🧾</span><span class="user-home-stat-label">Phiếu xuất của tôi</span>
+                            <strong>${outgoing.length.toLocaleString('vi-VN')}</strong><small>${approvedOutgoing} phiếu đã duyệt</small>
+                        </a>
+                        <a href="#/transactions" class="user-home-stat">
+                            <span class="user-home-stat-icon amber">◷</span><span class="user-home-stat-label">Đang chờ duyệt</span>
+                            <strong>${pendingOutgoing.toLocaleString('vi-VN')}</strong><small>Phiếu xuất cần theo dõi</small>
+                        </a>
+                    </div>
+
+                    <div class="user-home-lower">
+                        <section class="user-home-card user-home-recent">
+                            <div class="user-home-card-heading"><div><span class="user-home-kicker">LỊCH SỬ HOẠT ĐỘNG</span><h2>Phiếu xuất gần đây</h2></div><a href="#/transactions">Xem tất cả →</a></div>
+                            ${recentOutgoing.length ? `<div class="user-home-recent-list">${recentOutgoing.map(t => `
+                                <div class="user-home-transaction-row"><span class="user-home-tx-icon">📦</span><div class="user-home-tx-main"><strong>${esc(t.productName || t.product?.name || ('Sản phẩm #' + (t.productId || t.product?.id || '')))}</strong><small>${dt(t.createdAt)} · Số lượng: ${Number(t.quantity || 0).toLocaleString('vi-VN')}</small></div><span class="user-home-status ${String(t.status || '').toLowerCase()}">${esc(STATUS[t.status] || t.status || 'Không rõ')}</span></div>
+                            `).join('')}</div>` : `<div class="user-home-empty"><span>🧾</span><strong>Chưa có phiếu xuất nào</strong><p>Khi tạo phiếu xuất, lịch sử của bạn sẽ hiển thị tại đây.</p><a href="#/transactions">Tạo phiếu xuất đầu tiên →</a></div>`}
+                        </section>
+                        <section class="user-home-card user-home-shortcuts">
+                            <div class="user-home-card-heading"><div><span class="user-home-kicker">TIỆN ÍCH</span><h2>Truy cập nhanh</h2></div></div>
+                            <a href="#/products" class="user-home-shortcut"><span class="user-home-shortcut-icon blue">▦</span><span><strong>Danh sách sản phẩm</strong><small>Tìm và xem hàng hóa trong kho</small></span><b>→</b></a>
+                            <a href="#/transactions" class="user-home-shortcut"><span class="user-home-shortcut-icon violet">🧾</span><span><strong>Phiếu nhập / xuất</strong><small>Tạo phiếu xuất và theo dõi trạng thái</small></span><b>→</b></a>
+                            <a href="#/lectures" class="user-home-shortcut"><span class="user-home-shortcut-icon cyan">📚</span><span><strong>Bài giảng</strong><small>Xem tài liệu học tập được chia sẻ</small></span><b>→</b></a>
+                            <a href="#/special-requests" class="user-home-shortcut"><span class="user-home-shortcut-icon amber">💬</span><span><strong>Yêu cầu đặc biệt</strong><small>Trao đổi trực tiếp với quản lý kho</small></span><b>→</b></a>
+                        </section>
+                    </div>
+                </section>
+            `);
+            updateNotificationBadge();
+            return;
+        }
+
         /*
          * ADMIN + MANAGER:
          * → xem phiếu của tất cả mọi người
@@ -1747,7 +1841,7 @@ async function pageDashboard() {
 
 
         draw(`
-
+        <section class="admin-home">
                  <!-- ================= CHÀO MỪNG ================= -->
 
         <div class="welcome-banner">
@@ -1759,7 +1853,7 @@ async function pageDashboard() {
             <div class="welcome-content">
 
                 <div class="welcome-title">
-                    Chào mừng đến với Wings Up!
+                    ${isAdmin() ? 'TRUNG TÂM QUẢN TRỊ HỆ THỐNG' : 'TRUNG TÂM QUẢN LÝ KHO'}
                 </div>
 
                 <div class="welcome-name">
@@ -1767,7 +1861,7 @@ async function pageDashboard() {
                 </div>
 
                 <div class="welcome-subtitle">
-                    Chúc bạn một ngày làm việc hiệu quả với Wings Up.
+                    ${isAdmin() ? 'Theo dõi tổng quan, kiểm soát hoạt động và quản lý hệ thống Wings Up.' : 'Theo dõi tồn kho, xử lý phiếu và điều phối hoạt động kho nhanh chóng.'}
                 </div>
 
             </div>
@@ -1778,7 +1872,7 @@ async function pageDashboard() {
         <!-- ================= TRANG CHỦ ================= -->
 
         <h1>
-            Trang Chủ Kho
+            ${isAdmin() ? 'Tổng quan quản trị' : 'Tổng quan quản lý kho'}
         </h1>
 
 
@@ -1851,7 +1945,7 @@ async function pageDashboard() {
         <div class="panel">
 
             <h2>
-                Sản phẩm dưới mức tồn tối thiểu
+                ${isAdmin() ? 'Cảnh báo tồn kho thấp' : 'Sản phẩm cần bổ sung'}
             </h2>
 
 
@@ -1944,13 +2038,7 @@ async function pageDashboard() {
         <div class="panel">
 
             <h2>
-
-                ${
-                canViewAllTransactions
-                ? 'Phiếu gần đây'
-                : 'Phiếu gần đây của tôi'
-                }
-
+                ${isAdmin() ? 'Hoạt động kho gần đây' : 'Phiếu kho cần theo dõi'}
             </h2>
 
 
@@ -2076,6 +2164,7 @@ async function pageDashboard() {
                 }
 
         </div>
+        </section>
 
     `);
 
@@ -2810,6 +2899,7 @@ async function pageTransactions() {
 
     txLoad();
 }
+
 
 
 /* ================= Thông báo ================= */
@@ -3595,11 +3685,14 @@ function txDraw() {
         <!-- LỌC LỊCH SỬ -->
 
         <div
+            class="tx-date-filter"
             style="
                 display:flex;
                 align-items:end;
+                justify-content:center;
                 gap:10px;
-                margin:15px 0;
+                margin:15px auto;
+                width:100%;
                 flex-wrap:wrap;
             "
         >
@@ -6049,11 +6142,7 @@ ${
             }
 
             <button
-                class="
-                    btn
-                    danger
-                    small
-                "
+                class="btn danger small special-delete-button"
                 onclick="
                     deleteSpecialRequest(
                         ${active.id}
