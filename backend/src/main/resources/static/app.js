@@ -1754,80 +1754,6 @@ async function pageDashboard() {
                 user?.username ||
                 'bạn';
 
-        // Trang chủ riêng cho USER; không thay đổi dashboard ADMIN/MANAGER.
-        if (user?.role === 'USER') {
-            let ownTransactions = [];
-            try {
-                ownTransactions = await api('/transactions');
-                if (!Array.isArray(ownTransactions)) ownTransactions = [];
-            } catch (e) {
-                console.warn('Không tải được thống kê phiếu xuất:', e);
-            }
-
-            const outgoing = ownTransactions.filter(t => String(t.type || '').toUpperCase() === 'OUT');
-            const pendingOutgoing = outgoing.filter(t => String(t.status || '').toUpperCase() === 'PENDING').length;
-            const approvedOutgoing = outgoing.filter(t => String(t.status || '').toUpperCase() === 'APPROVED').length;
-            const recentOutgoing = outgoing.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5);
-
-            draw(`
-                <section class="user-home">
-                    <div class="user-home-hero">
-                        <div class="user-home-hero-copy">
-                            <span class="user-home-eyebrow">WINGS UP · EDU SUCCESS</span>
-                            <h1>Xin chào, ${esc(welcomeName)}! <span>👋</span></h1>
-                            <p>Chào mừng bạn quay lại. Theo dõi sản phẩm và quản lý các phiếu xuất kho của mình tại đây.</p>
-                            <div class="user-home-actions">
-                                <a class="user-home-primary" href="#/transactions">＋ Tạo phiếu xuất</a>
-                                <a class="user-home-secondary" href="#/products">Xem sản phẩm <span>→</span></a>
-                            </div>
-                        </div>
-                        <div class="user-home-hero-art" aria-hidden="true"><div class="user-home-art-box">📦</div><span class="user-home-art-dot dot-one"></span><span class="user-home-art-dot dot-two"></span></div>
-                    </div>
-
-                    <div class="user-home-section-heading">
-                        <div><span class="user-home-kicker">TỔNG QUAN CỦA BẠN</span><h2>Thống kê nhanh</h2></div>
-                        <span class="user-home-live"><i></i> Dữ liệu hệ thống</span>
-                    </div>
-                    <div class="user-home-stats">
-                        <a href="#/products" class="user-home-stat">
-                            <span class="user-home-stat-icon blue">▦</span><span class="user-home-stat-label">Loại sản phẩm</span>
-                            <strong>${Number(d.totalProducts || 0).toLocaleString('vi-VN')}</strong><small>Sản phẩm hiện có trong kho</small>
-                        </a>
-                        <a href="#/products" class="user-home-stat">
-                            <span class="user-home-stat-icon cyan">📦</span><span class="user-home-stat-label">Tổng lượng tồn</span>
-                            <strong>${Number(d.totalQuantity || 0).toLocaleString('vi-VN')}</strong><small>Đơn vị hàng hóa trong kho</small>
-                        </a>
-                        <a href="#/transactions" class="user-home-stat">
-                            <span class="user-home-stat-icon violet">🧾</span><span class="user-home-stat-label">Phiếu xuất của tôi</span>
-                            <strong>${outgoing.length.toLocaleString('vi-VN')}</strong><small>${approvedOutgoing} phiếu đã duyệt</small>
-                        </a>
-                        <a href="#/transactions" class="user-home-stat">
-                            <span class="user-home-stat-icon amber">◷</span><span class="user-home-stat-label">Đang chờ duyệt</span>
-                            <strong>${pendingOutgoing.toLocaleString('vi-VN')}</strong><small>Phiếu xuất cần theo dõi</small>
-                        </a>
-                    </div>
-
-                    <div class="user-home-lower">
-                        <section class="user-home-card user-home-recent">
-                            <div class="user-home-card-heading"><div><span class="user-home-kicker">LỊCH SỬ HOẠT ĐỘNG</span><h2>Phiếu xuất gần đây</h2></div><a href="#/transactions">Xem tất cả →</a></div>
-                            ${recentOutgoing.length ? `<div class="user-home-recent-list">${recentOutgoing.map(t => `
-                                <div class="user-home-transaction-row"><span class="user-home-tx-icon">📦</span><div class="user-home-tx-main"><strong>${esc(t.productName || t.product?.name || ('Sản phẩm #' + (t.productId || t.product?.id || '')))}</strong><small>${dt(t.createdAt)} · Số lượng: ${Number(t.quantity || 0).toLocaleString('vi-VN')}</small></div><span class="user-home-status ${String(t.status || '').toLowerCase()}">${esc(STATUS[t.status] || t.status || 'Không rõ')}</span></div>
-                            `).join('')}</div>` : `<div class="user-home-empty"><span>🧾</span><strong>Chưa có phiếu xuất nào</strong><p>Khi tạo phiếu xuất, lịch sử của bạn sẽ hiển thị tại đây.</p><a href="#/transactions">Tạo phiếu xuất đầu tiên →</a></div>`}
-                        </section>
-                        <section class="user-home-card user-home-shortcuts">
-                            <div class="user-home-card-heading"><div><span class="user-home-kicker">TIỆN ÍCH</span><h2>Truy cập nhanh</h2></div></div>
-                            <a href="#/products" class="user-home-shortcut"><span class="user-home-shortcut-icon blue">▦</span><span><strong>Danh sách sản phẩm</strong><small>Tìm và xem hàng hóa trong kho</small></span><b>→</b></a>
-                            <a href="#/transactions" class="user-home-shortcut"><span class="user-home-shortcut-icon violet">🧾</span><span><strong>Phiếu nhập / xuất</strong><small>Tạo phiếu xuất và theo dõi trạng thái</small></span><b>→</b></a>
-                            <a href="#/lectures" class="user-home-shortcut"><span class="user-home-shortcut-icon cyan">📚</span><span><strong>Bài giảng</strong><small>Xem tài liệu học tập được chia sẻ</small></span><b>→</b></a>
-                            <a href="#/special-requests" class="user-home-shortcut"><span class="user-home-shortcut-icon amber">💬</span><span><strong>Yêu cầu đặc biệt</strong><small>Trao đổi trực tiếp với quản lý kho</small></span><b>→</b></a>
-                        </section>
-                    </div>
-                </section>
-            `);
-            updateNotificationBadge();
-            return;
-        }
-
         /*
          * ADMIN + MANAGER:
          * → xem phiếu của tất cả mọi người
@@ -1840,8 +1766,59 @@ async function pageDashboard() {
                 isManager();
 
 
+        // Trang chủ riêng cho USER: tiện ích thao tác nhanh và thống kê cá nhân.
+        if (user?.role === 'USER') {
+            draw(`
+                <section style="background:linear-gradient(120deg,#123b78,#2563eb);color:#fff;border-radius:20px;padding:26px 28px;margin-bottom:22px;box-shadow:0 12px 28px rgba(37,99,235,.18);">
+                    <div style="font-size:13px;letter-spacing:1.2px;opacity:.85;font-weight:700;">WINGS UP · KHÔNG GIAN CỦA BẠN</div>
+                    <h1 style="color:#fff;margin:10px 0 6px;font-size:28px;">Xin chào, ${esc(welcomeName)} 👋</h1>
+                    <div style="opacity:.9;">Chúc bạn một ngày làm việc hiệu quả. Chọn tiện ích bên dưới để bắt đầu.</div>
+                </section>
+
+                <h2 style="margin:0 0 14px;color:#172b4d;">Tổng quan của tôi</h2>
+                <div class="grid" style="margin-bottom:22px;">
+                    <div class="stat"><span>📦 Số loại sản phẩm</span><strong>${Number(d.totalProducts || 0)}</strong></div>
+                    <div class="stat"><span>🏷️ Tổng số lượng tồn</span><strong>${Number(d.totalQuantity || 0)}</strong></div>
+                    <div class="stat"><span>⏳ Phiếu chờ duyệt của tôi</span><strong>${Number(d.pendingCount || 0)}</strong></div>
+                    <div class="stat"><span>⚠️ Sản phẩm sắp hết</span><strong>${Number(d.lowStockCount || 0)}</strong></div>
+                </div>
+
+                <h2 style="margin:0 0 14px;color:#172b4d;">Tiện ích nhanh</h2>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:22px;">
+                    <a href="#/transactions" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e4eaf4;border-radius:16px;padding:20px;box-shadow:0 5px 18px rgba(25,45,80,.05);transition:transform .18s,box-shadow .18s;">
+                        <div style="font-size:27px;margin-bottom:10px;">🧾</div><strong style="display:block;color:#173b75;font-size:16px;margin-bottom:6px;">Phiếu nhập/xuất</strong><span style="color:#667085;font-size:13px;">Tạo phiếu xuất kho và theo dõi trạng thái.</span>
+                    </a>
+                    <a href="#/products" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e4eaf4;border-radius:16px;padding:20px;box-shadow:0 5px 18px rgba(25,45,80,.05);">
+                        <div style="font-size:27px;margin-bottom:10px;">📦</div><strong style="display:block;color:#173b75;font-size:16px;margin-bottom:6px;">Tra cứu sản phẩm</strong><span style="color:#667085;font-size:13px;">Xem danh sách và số lượng tồn kho.</span>
+                    </a>
+                    <a href="#/lectures" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e4eaf4;border-radius:16px;padding:20px;box-shadow:0 5px 18px rgba(25,45,80,.05);">
+                        <div style="font-size:27px;margin-bottom:10px;">📚</div><strong style="display:block;color:#173b75;font-size:16px;margin-bottom:6px;">Bài giảng</strong><span style="color:#667085;font-size:13px;">Xem tài liệu hướng dẫn sử dụng.</span>
+                    </a>
+                    <a href="#/special-requests" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e4eaf4;border-radius:16px;padding:20px;box-shadow:0 5px 18px rgba(25,45,80,.05);">
+                        <div style="font-size:27px;margin-bottom:10px;">💬</div><strong style="display:block;color:#173b75;font-size:16px;margin-bottom:6px;">Yêu cầu đặc biệt</strong><span style="color:#667085;font-size:13px;">Trao đổi trực tiếp với quản lý kho.</span>
+                    </a>
+                    <a href="#/notifications" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e4eaf4;border-radius:16px;padding:20px;box-shadow:0 5px 18px rgba(25,45,80,.05);">
+                        <div style="font-size:27px;margin-bottom:10px;">🔔</div><strong style="display:block;color:#173b75;font-size:16px;margin-bottom:6px;">Thông báo</strong><span style="color:#667085;font-size:13px;">Theo dõi cập nhật và phản hồi phiếu.</span>
+                    </a>
+                    <a href="#/profile" style="display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e4eaf4;border-radius:16px;padding:20px;box-shadow:0 5px 18px rgba(25,45,80,.05);">
+                        <div style="font-size:27px;margin-bottom:10px;">👤</div><strong style="display:block;color:#173b75;font-size:16px;margin-bottom:6px;">Hồ sơ cá nhân</strong><span style="color:#667085;font-size:13px;">Xem và cập nhật thông tin tài khoản.</span>
+                    </a>
+                </div>
+
+                <div class="panel">
+                    <h2>Phiếu gần đây của tôi</h2>
+                    ${d.recent && d.recent.length ? `
+                        <div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Loại</th><th>Sản phẩm</th><th class="num">Số lượng</th><th>Trạng thái</th></tr></thead><tbody>
+                        ${d.recent.map(t => `<tr><td>${dt(t.createdAt)}</td><td><span class="badge ${t.type}">${t.type === 'IN' ? 'Nhập' : 'Xuất'}</span></td><td>${esc(t.product?.name || 'Sản phẩm đã xóa')}</td><td class="num">${t.quantity}</td><td><span class="badge ${t.status}">${STATUS[t.status] || t.status}</span></td></tr>`).join('')}
+                        </tbody></table></div>
+                    ` : '<div class="empty">Bạn chưa có phiếu nào.</div>'}
+                </div>
+            `);
+            return;
+        }
+
         draw(`
-        <section class="admin-home">
+
                  <!-- ================= CHÀO MỪNG ================= -->
 
         <div class="welcome-banner">
@@ -1853,7 +1830,7 @@ async function pageDashboard() {
             <div class="welcome-content">
 
                 <div class="welcome-title">
-                    ${isAdmin() ? 'TRUNG TÂM QUẢN TRỊ HỆ THỐNG' : 'TRUNG TÂM QUẢN LÝ KHO'}
+                    Chào mừng đến với Wings Up!
                 </div>
 
                 <div class="welcome-name">
@@ -1861,7 +1838,7 @@ async function pageDashboard() {
                 </div>
 
                 <div class="welcome-subtitle">
-                    ${isAdmin() ? 'Theo dõi tổng quan, kiểm soát hoạt động và quản lý hệ thống Wings Up.' : 'Theo dõi tồn kho, xử lý phiếu và điều phối hoạt động kho nhanh chóng.'}
+                    Chúc bạn một ngày làm việc hiệu quả với Wings Up.
                 </div>
 
             </div>
@@ -1872,7 +1849,7 @@ async function pageDashboard() {
         <!-- ================= TRANG CHỦ ================= -->
 
         <h1>
-            ${isAdmin() ? 'Tổng quan quản trị' : 'Tổng quan quản lý kho'}
+            Trang Chủ Kho
         </h1>
 
 
@@ -1945,7 +1922,7 @@ async function pageDashboard() {
         <div class="panel">
 
             <h2>
-                ${isAdmin() ? 'Cảnh báo tồn kho thấp' : 'Sản phẩm cần bổ sung'}
+                Sản phẩm dưới mức tồn tối thiểu
             </h2>
 
 
@@ -2038,7 +2015,13 @@ async function pageDashboard() {
         <div class="panel">
 
             <h2>
-                ${isAdmin() ? 'Hoạt động kho gần đây' : 'Phiếu kho cần theo dõi'}
+
+                ${
+                canViewAllTransactions
+                ? 'Phiếu gần đây'
+                : 'Phiếu gần đây của tôi'
+                }
+
             </h2>
 
 
@@ -2164,7 +2147,6 @@ async function pageDashboard() {
                 }
 
         </div>
-        </section>
 
     `);
 
@@ -2894,7 +2876,9 @@ async function pageTransactions() {
         error: '',
         success: '',
         fromDate: '',
-        toDate: ''
+        toDate: '',
+        statusFilter: 'ALL',
+        typeFilter: 'ALL'
     };
 
     txLoad();
@@ -3086,34 +3070,8 @@ function txExportExcel() {
         return;
     }
 
-    // Lọc dữ liệu giống bảng lịch sử
-    const filteredItems = tx.items.filter(t => {
-
-        if (!tx.fromDate && !tx.toDate) {
-            return true;
-        }
-
-        const date = new Date(t.createdAt);
-
-        if (isNaN(date.getTime())) {
-            return false;
-        }
-
-        const itemDate =
-                date.getFullYear() + '-' +
-                String(date.getMonth() + 1).padStart(2, '0') + '-' +
-                String(date.getDate()).padStart(2, '0');
-
-        if (tx.fromDate && itemDate < tx.fromDate) {
-            return false;
-        }
-
-        if (tx.toDate && itemDate > tx.toDate) {
-            return false;
-        }
-
-        return true;
-    });
+    // Dùng chung bộ lọc với bảng lịch sử để Excel khớp dữ liệu đang xem.
+    const filteredItems = txGetFilteredItems();
 
     if (filteredItems.length === 0) {
         alert('Không có phiếu nào để xuất Excel.');
@@ -3448,26 +3406,39 @@ const txCanCancel = (t) =>
                             )
                     );
 function txFilterDate() {
+    const from = document.getElementById('tx_from_date');
+    const to = document.getElementById('tx_to_date');
+    const status = document.getElementById('tx_status_filter');
+    const type = document.getElementById('tx_type_filter');
 
-    const from =
-            document.getElementById(
-                    'tx_from_date'
-                    );
-    const to =
-            document.getElementById(
-                    'tx_to_date'
-                    );
-    tx.fromDate =
-            from
-            ? from.value
-            : '';
-    tx.toDate =
-            to
-            ? to.value
-            : '';
+    tx.fromDate = from ? from.value : '';
+    tx.toDate = to ? to.value : '';
+    tx.statusFilter = status ? status.value : 'ALL';
+    tx.typeFilter = type ? type.value : 'ALL';
+
+    if (tx.fromDate && tx.toDate && tx.fromDate > tx.toDate) {
+        alert('Ngày bắt đầu không được lớn hơn ngày kết thúc.');
+        return;
+    }
     txDraw();
 }
 
+function txGetFilteredItems() {
+    return (tx.items || []).filter(t => {
+        if (tx.fromDate || tx.toDate) {
+            const date = new Date(t.createdAt);
+            if (isNaN(date.getTime())) return false;
+            const itemDate = date.getFullYear() + '-' +
+                String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                String(date.getDate()).padStart(2, '0');
+            if (tx.fromDate && itemDate < tx.fromDate) return false;
+            if (tx.toDate && itemDate > tx.toDate) return false;
+        }
+        if (tx.statusFilter && tx.statusFilter !== 'ALL' && t.status !== tx.statusFilter) return false;
+        if (tx.typeFilter && tx.typeFilter !== 'ALL' && t.type !== tx.typeFilter) return false;
+        return true;
+    });
+}
 
 /* ================= Vẽ phiếu ================= */
 
@@ -3487,60 +3458,7 @@ function txDraw() {
         f.type = 'OUT';
     }
 
-    const filteredItems =
-            tx.items.filter(t => {
-
-                if (
-                        !tx.fromDate &&
-                        !tx.toDate
-                        ) {
-
-                    return true;
-                }
-
-                const date =
-                        new Date(
-                                t.createdAt
-                                );
-
-                if (
-                        isNaN(
-                                date.getTime()
-                                )
-                        ) {
-
-                    return false;
-                }
-
-                const itemDate =
-                        date.getFullYear() +
-                        '-' +
-                        String(
-                                date.getMonth() + 1
-                                ).padStart(2, '0') +
-                        '-' +
-                        String(
-                                date.getDate()
-                                ).padStart(2, '0');
-
-                if (
-                        tx.fromDate &&
-                        itemDate < tx.fromDate
-                        ) {
-
-                    return false;
-                }
-
-                if (
-                        tx.toDate &&
-                        itemDate > tx.toDate
-                        ) {
-
-                    return false;
-                }
-
-                return true;
-            });
+    const filteredItems = txGetFilteredItems();
 
     draw(`
 
@@ -3668,12 +3586,14 @@ function txDraw() {
         Tạo phiếu
     </button>
 
+    ${!isUser ? `
     <button
         class="btn ok"
         onclick="txCreateAndExportExcel()"
     >
         📊 Tạo phiếu và Xuất Excel
     </button>
+    ` : ''}
 
 </div>
 
@@ -3685,14 +3605,11 @@ function txDraw() {
         <!-- LỌC LỊCH SỬ -->
 
         <div
-            class="tx-date-filter"
             style="
                 display:flex;
                 align-items:end;
-                justify-content:center;
                 gap:10px;
-                margin:15px auto;
-                width:100%;
+                margin:15px 0;
                 flex-wrap:wrap;
             "
         >
@@ -3723,6 +3640,25 @@ function txDraw() {
 
             </label>
 
+            <label style="margin:0;">
+                Trạng thái
+                <select id="tx_status_filter" style="min-width:145px; height:38px;">
+                    <option value="ALL" ${(!tx.statusFilter || tx.statusFilter === 'ALL') ? 'selected' : ''}>Tất cả trạng thái</option>
+                    <option value="PENDING" ${tx.statusFilter === 'PENDING' ? 'selected' : ''}>Chờ duyệt</option>
+                    <option value="APPROVED" ${tx.statusFilter === 'APPROVED' ? 'selected' : ''}>Đã duyệt</option>
+                    <option value="REJECTED" ${tx.statusFilter === 'REJECTED' ? 'selected' : ''}>Từ chối</option>
+                </select>
+            </label>
+
+            <label style="margin:0;">
+                Loại phiếu
+                <select id="tx_type_filter" style="min-width:125px; height:38px;">
+                    <option value="ALL" ${(!tx.typeFilter || tx.typeFilter === 'ALL') ? 'selected' : ''}>Tất cả loại</option>
+                    <option value="IN" ${tx.typeFilter === 'IN' ? 'selected' : ''}>Nhập kho</option>
+                    <option value="OUT" ${tx.typeFilter === 'OUT' ? 'selected' : ''}>Xuất kho</option>
+                </select>
+            </label>
+
             <button
                 class="btn"
                 onclick="txFilterDate()"
@@ -3731,6 +3667,7 @@ function txDraw() {
                 🔍 Lọc
             </button>
     
+            ${!isUser ? `
             <button
                 class="btn ok"
                 onclick="txExportExcel()"
@@ -3738,6 +3675,7 @@ function txDraw() {
             >
                 📊 Xuất Excel
             </button>
+            ` : ''}
 
         </div>
 
@@ -3936,7 +3874,7 @@ function txDraw() {
             tx.fromDate ||
             tx.toDate
 
-            ? 'Không có phiếu nào trong khoảng thời gian đã chọn.'
+            ? 'Không có phiếu nào khớp với bộ lọc đã chọn.'
 
             : 'Chưa có phiếu nào.'
             }
@@ -6142,7 +6080,11 @@ ${
             }
 
             <button
-                class="btn danger small special-delete-button"
+                class="
+                    btn
+                    danger
+                    small
+                "
                 onclick="
                     deleteSpecialRequest(
                         ${active.id}
