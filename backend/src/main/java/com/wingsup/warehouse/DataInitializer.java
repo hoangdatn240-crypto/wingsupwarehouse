@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 
 /** Tạo dữ liệu mẫu lần chạy đầu tiên. */
-@Component
 public class DataInitializer implements CommandLineRunner {
 
     private final AppUserRepository users;
